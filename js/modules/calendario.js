@@ -309,9 +309,26 @@ async function cargarYPintar() {
   if (filtrosEl) pintarFiltros(filtrosEl);
 }
 
+// El calendario abría siempre en el mes de hoy — antes del evento (la
+// inmensa mayoría del tiempo que este módulo se usa) eso es un mes vacío
+// sin ninguna pista de que las actividades reales están más adelante. Si
+// hoy es anterior al evento, arranca directo en su mes; durante o después
+// del evento, "hoy" sigue siendo lo más útil de mostrar.
+async function calcularCursorInicial() {
+  const { data } = await supabase
+    .from('configuracion_sistema')
+    .select('valor')
+    .eq('clave', 'fecha_evento_inicio')
+    .maybeSingle();
+  const inicioEvento = data?.valor || null;
+  if (inicioEvento && hoyISO() < inicioEvento) return inicioEvento;
+  return hoyISO();
+}
+
 export async function render(el) {
   contenedor = el;
   const { sesion } = getEstado();
+  cursor = await calcularCursorInicial();
 
   el.innerHTML = `
     <div class="vista-cabecera">
