@@ -1,0 +1,42 @@
+:root {
+  /* Azul marino */
+  --navy-900: #0A1F38;
+  --navy-700: #14375C;
+  --navy-500: #1F4E7A;
+  --navy-300: #5B7FA3;
+
+  /* Dorado — nunca como color de texto sobre fondo claro (--gold-600 en su
+     lugar). Reservado a bordes, íconos, líneas y acentos. */
+  --gold-600: #8A6D12;
+  --gold-500: #C9A227;
+  --gold-300: #E0BC4A;
+  --gold-100: #F5EBC8;
+
+  /* Neutros */
+  --paper: #FAF9F6;
+  --surface: #FFFFFF;
+  --ink: #15171C;
+  --ink-2: #4A4D55;
+  --ink-3: #8A8D95;
+  --rule: #E2DFD6;
+
+  /* Estados */
+  --ok: #1A7F5A;
+  --warn: #B5791A;
+  --danger: #A8412F;
+
+  /* Tipografía — dos familias, cinco tamaños en total */
+  --fuente-titulo: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --fuente-texto: 'Source Sans 3', -apple-system, 'Segoe UI', sans-serif;
+
+  --texto-xs: 0.8125rem;   /* metadatos, etiquetas */
+  --texto-sm: 0.9375rem;   /* texto secundario */
+  --texto-base: 1rem;      /* cuerpo */
+  --texto-lg: 1.375rem;    /* subtítulos de sección */
+  --texto-xl: 1.875rem;    /* títulos de pantalla */
+
+  --radio: 10px;
+  --radio-chico: 6px;
+  --sombra: 0 2px 10px rgba(10, 31, 56, 0.08);
+  --toque-minimo: 44px;
+}

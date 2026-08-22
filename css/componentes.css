@@ -1,0 +1,359 @@
+/* ---------------------------------------------------------------- botones */
+
+.boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+  min-height: var(--toque-minimo);
+  padding: 0 1.1em;
+  border-radius: var(--radio-chico);
+  border: 1px solid transparent;
+  font-size: var(--texto-sm);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+/* Los botones primarios son azul marino con texto blanco, nunca dorados. */
+.boton--primario {
+  background: var(--navy-500);
+  color: #fff;
+}
+.boton--primario:hover { background: var(--navy-700); }
+.boton--primario:disabled { background: var(--navy-300); cursor: not-allowed; }
+
+.boton--secundario {
+  background: var(--surface);
+  color: var(--navy-700);
+  border-color: var(--navy-300);
+}
+.boton--secundario:hover { background: var(--navy-900); color: #fff; }
+
+.boton--fantasma {
+  background: transparent;
+  color: var(--navy-500);
+  padding-left: 0.3em;
+  padding-right: 0.3em;
+}
+.boton--fantasma:hover { text-decoration: underline; }
+
+.boton--ancho { width: 100%; }
+.boton--pequeno { min-height: 34px; padding: 0 0.75em; font-size: var(--texto-xs); }
+
+.boton-icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--toque-minimo);
+  height: var(--toque-minimo);
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--navy-700);
+  cursor: pointer;
+}
+.boton-icono:hover { background: var(--navy-900); color: #fff; }
+
+/* ------------------------------------------------------------------ chips */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 0.9em;
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--texto-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+.chip--activo {
+  background: var(--navy-900);
+  border-color: var(--navy-900);
+  color: #fff;
+}
+.filtros-chip { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.75rem 0 1.25rem; }
+
+/* -------------------------------------------------------------- etiquetas */
+
+.estado {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--texto-xs);
+  font-weight: 600;
+  padding: 0.15em 0.65em;
+  border-radius: 999px;
+  background: var(--rule);
+  color: var(--ink-2);
+}
+.estado--no-iniciada { background: #ECEAE3; color: var(--ink-2); }
+.estado--en-curso { background: #DCEAFE; color: var(--navy-700); }
+.estado--en-revision { background: var(--gold-100); color: var(--gold-600); }
+.estado--completada { background: #DBF0E6; color: var(--ok); }
+.estado--cancelada, .estado--no-aplica { background: #F1EFEA; color: var(--ink-3); }
+.estado--planificada { background: #ECEAE3; color: var(--ink-2); }
+.estado--confirmada { background: #DCEAFE; color: var(--navy-700); }
+.estado--realizada { background: #DBF0E6; color: var(--ok); }
+
+.prioridad {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--texto-xs);
+  font-weight: 600;
+  padding: 0.15em 0.65em;
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+  color: var(--ink-2);
+  margin-left: 0.4em;
+}
+.prioridad--alta { border-color: var(--gold-500); color: var(--gold-600); }
+.prioridad--critica { border-color: var(--danger); color: var(--danger); }
+
+/* ---------------------------------------------------------- barra de progreso */
+
+.barra-progreso {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--rule);
+  overflow: hidden;
+  margin: 0.6em 0;
+}
+.barra-progreso--pequena { height: 4px; margin: 0.4em 0; }
+.barra-progreso__relleno {
+  height: 100%;
+  background: var(--navy-500);
+  border-radius: inherit;
+  transition: width 0.3s ease;
+}
+
+/* ------------------------------------------------------------- tarjetas de tarea */
+
+.lista-tareas { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.tarjeta-tarea {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radio);
+  padding: 1rem;
+}
+.tarjeta-tarea--vencida { border-color: var(--danger); }
+
+.tarjeta-tarea__cima {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.4em;
+  font-size: var(--texto-xs);
+  color: var(--ink-3);
+}
+
+.tarjeta-tarea__titulo {
+  font-family: var(--fuente-texto);
+  font-size: var(--texto-base);
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 0.15em;
+}
+
+.tarjeta-tarea__actividad { font-size: var(--texto-xs); margin: 0 0 0.2em; }
+
+.tarjeta-tarea__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+/* -------------------------------------------------------------- formularios */
+
+.formulario { display: flex; flex-direction: column; gap: 0.9rem; }
+.formulario--en-linea { flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 0.6rem; }
+.formulario--en-linea input { flex: 1 1 160px; min-height: var(--toque-minimo); }
+
+.formulario__fila { display: flex; gap: 0.9rem; flex-wrap: wrap; }
+.formulario__fila .campo { flex: 1 1 200px; }
+
+.campo { display: flex; flex-direction: column; gap: 0.3rem; font-size: var(--texto-sm); }
+.campo > span { font-weight: 600; color: var(--navy-700); }
+
+input, select, textarea {
+  min-height: var(--toque-minimo);
+  padding: 0 0.8em;
+  border: 1px solid var(--rule);
+  border-radius: var(--radio-chico);
+  background: var(--surface);
+  color: var(--ink);
+}
+textarea { padding: 0.6em 0.8em; min-height: 5em; resize: vertical; }
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid var(--navy-300);
+  outline-offset: 1px;
+}
+
+.select-inline {
+  min-height: 38px;
+  font-size: var(--texto-xs);
+  max-width: 100%;
+}
+
+input[type="range"].deslizador {
+  min-height: auto;
+  padding: 0;
+  border: none;
+  accent-color: var(--navy-500);
+  width: 100%;
+}
+
+.hoja-avance { display: flex; flex-direction: column; gap: 1rem; }
+.hoja-avance__tarea { font-weight: 600; color: var(--navy-900); }
+
+/* -------------------------------------------------------------------- modal */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 31, 56, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 100;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.modal-overlay--visible { opacity: 1; }
+
+.modal-panel {
+  background: var(--surface);
+  width: 100%;
+  max-width: 560px;
+  max-height: 88vh;
+  border-radius: var(--radio) var(--radio) 0 0;
+  overflow-y: auto;
+  transform: translateY(12px);
+  transition: transform 0.2s;
+}
+.modal-overlay--visible .modal-panel { transform: translateY(0); }
+.modal-panel--angosto { max-width: 420px; }
+
+.modal-header {
+  position: sticky;
+  top: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--rule);
+}
+.modal-header h2 { margin: 0; font-size: var(--texto-lg); }
+.modal-cerrar {
+  border: none;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  width: var(--toque-minimo);
+  height: var(--toque-minimo);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-cuerpo { padding: 1.25rem; }
+
+@media (min-width: 640px) {
+  .modal-overlay { align-items: center; }
+  .modal-panel { border-radius: var(--radio); }
+}
+
+/* ------------------------------------------------------------------- avisos */
+
+.toasts {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 200;
+  width: min(92vw, 420px);
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.75em 1em;
+  border-radius: var(--radio-chico);
+  background: var(--navy-900);
+  color: #fff;
+  font-size: var(--texto-sm);
+  box-shadow: var(--sombra);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+.toast--visible { opacity: 1; transform: translateY(0); }
+.toast--error { background: var(--danger); }
+.toast--exito { background: var(--ok); }
+
+.aviso-inline {
+  display: flex;
+  gap: 0.6em;
+  padding: 0.8em 1em;
+  border-radius: var(--radio-chico);
+  background: var(--gold-100);
+  color: var(--gold-600);
+  margin: 1em 0;
+}
+.aviso-inline strong { display: block; color: var(--gold-600); }
+.aviso-inline p { margin: 0.2em 0 0; color: var(--ink-2); }
+
+.banner-conexion {
+  background: var(--navy-900);
+  color: var(--gold-300);
+  text-align: center;
+  font-size: var(--texto-xs);
+  font-weight: 600;
+  padding: 0.5em 1em;
+}
+
+/* -------------------------------------------------------------------- tabla */
+
+.tabla-envoltorio { overflow-x: auto; border: 1px solid var(--rule); border-radius: var(--radio); }
+.tabla { width: 100%; border-collapse: collapse; font-size: var(--texto-sm); }
+.tabla th, .tabla td { text-align: left; padding: 0.65em 0.9em; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+.tabla th { background: var(--paper); color: var(--navy-700); font-weight: 600; font-size: var(--texto-xs); }
+.tabla tr:last-child td { border-bottom: none; }
+.tabla-vacia { color: var(--ink-3); text-align: center; }
+.tabla__acciones { display: flex; gap: 0.4rem; }
+
+/* -------------------------------------------------------------------- avances */
+
+.lista-avances { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.9rem; }
+.avance {
+  border-left: 2px solid var(--gold-500);
+  padding-left: 1rem;
+}
+.avance__cima { display: flex; justify-content: space-between; font-size: var(--texto-xs); color: var(--ink-3); }
+.avance__progreso { font-size: var(--texto-xs); color: var(--navy-700); font-weight: 600; margin: 0 0 0.2em; }
+.avance__nota { margin: 0; }
+
+/* --------------------------------------------------------------- ficha de datos */
+
+.ficha-datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.9rem;
+  margin: 1rem 0;
+  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radio);
+}
+.ficha-datos span { display: block; font-size: var(--texto-xs); color: var(--ink-3); }
+.ficha-datos strong { font-family: var(--fuente-texto); font-variant-numeric: tabular-nums; }

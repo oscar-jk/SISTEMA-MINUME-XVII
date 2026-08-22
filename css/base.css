@@ -1,0 +1,62 @@
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--fuente-texto);
+  font-size: var(--texto-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-family: var(--fuente-titulo);
+  font-weight: 700;
+  color: var(--navy-900);
+  margin: 0 0 0.25em;
+  line-height: 1.2;
+}
+
+h1 { font-size: var(--texto-xl); }
+h2.subtitulo { font-size: var(--texto-lg); margin-top: 1.5em; }
+
+p { margin: 0 0 0.75em; color: var(--ink-2); }
+
+a { color: var(--navy-500); }
+
+button { font-family: inherit; }
+
+img, svg { display: block; max-width: 100%; }
+
+table, .tabla { font-variant-numeric: tabular-nums; }
+
+input, select, textarea {
+  font-family: inherit;
+  font-size: var(--texto-base);
+}
+
+.sin-scroll { overflow: hidden; }
+
+.icono { flex-shrink: 0; }
+
+.texto-mudo { color: var(--ink-3); }
+.texto-pequeno { font-size: var(--texto-xs); }
+.texto-danger { color: var(--danger); }
+
+.estado-vacio {
+  color: var(--ink-3);
+  font-size: var(--texto-sm);
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.marcador-prioridad {
+  color: var(--gold-500);
+  vertical-align: -1px;
+  margin-right: 2px;
+}
+
+::selection { background: var(--gold-100); }
