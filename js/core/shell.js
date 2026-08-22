@@ -18,6 +18,7 @@ import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 const ENLACES_NAV = [
   { href: '/tablero.html', texto: 'Tablero', iconoNombre: 'tablero' },
   { href: '/mis-tareas.html', texto: 'Mis tareas', iconoNombre: 'check-circulo' },
+  { href: '/checklist.html', texto: 'Checklist', iconoNombre: 'check' },
   { href: '/calendario.html', texto: 'Calendario', iconoNombre: 'calendario' },
   { href: '/bandeja.html', texto: 'Bandeja', iconoNombre: 'bandeja', requiere: 'asignar' },
   { href: '/organigrama.html', texto: 'Organigrama', iconoNombre: 'organigrama' },

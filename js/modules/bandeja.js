@@ -31,7 +31,7 @@ function orden(t) {
   return 2;
 }
 
-function abrirHojaDevolucion(tarea, alTerminar) {
+export function abrirHojaDevolucion(tarea, alTerminar) {
   const div = document.createElement('div');
   div.innerHTML = `
     <label class="campo">
@@ -62,14 +62,14 @@ function abrirHojaDevolucion(tarea, alTerminar) {
   });
 }
 
-async function aprobar(tarea) {
+export async function aprobar(tarea, alTerminar) {
   const { error } = await supabase.from('tareas').update({ estado: 'completada' }).eq('id', tarea.id);
   if (error) {
     mostrarAviso(mensajeError(error), 'error');
     return;
   }
   mostrarAviso('Tarea aprobada.', 'exito');
-  await recargar();
+  await (alTerminar || recargar)();
 }
 
 function fila(tarea) {

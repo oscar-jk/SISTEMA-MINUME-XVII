@@ -63,7 +63,7 @@ enlace "Admin" y su propia sub-navegación en cada página `admin-*.html`
 ## Estructura
 
 ```
-/index.html · tablero.html · mis-tareas.html · calendario.html · actividad.html · tarea.html · bandeja.html
+/index.html · tablero.html · checklist.html · mis-tareas.html · calendario.html · actividad.html · tarea.html · bandeja.html
 /organigrama.html · espacios.html · asistencia.html
 /admin-personas.html · admin-cuentas.html · admin-catalogos.html · admin-configuracion.html · bitacora.html
 /css/                 tokens.css · base.css · componentes.css · vistas.css
@@ -240,6 +240,23 @@ Policy` sin `unsafe-inline` en scripts, `X-Frame-Options`,
 `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`) — si
 se agrega un dominio externo nuevo (fuente, API, CDN), hay que sumarlo a
 la CSP o el navegador lo bloquea en silencio.
+
+## Checklist
+
+`checklist.html` es una vista transversal de todas las tareas visibles
+para quien mira (no solo las propias, como Mis tareas), agrupadas por
+fase del evento (`fases_actividad`, ya existente) con contador de
+completadas por grupo y total. No es una tabla nueva ni un "hecho/no
+hecho" aparte: reutiliza `tareas` tal cual, con las mismas funciones de
+`permisos.js` y las mismas acciones (registrar avance, enviar a
+revisión, aprobar/devolver) ya construidas en `tareas.js`/`bandeja.js`
+— exportadas de ahí, no duplicadas. Nace de comparar SIRIO contra
+`sistema-de-check-in-minume-xvii.vercel.app`, un prototipo de
+acreditación/checklist para MINUME XVII que hoy no tiene backend real
+(todo en `localStorage`, sin Supabase) — sus otras piezas (acreditación
+con QR, datos de salud/hospedaje, croquis con estado de salón en vivo,
+directorio de staff) quedan para rondas futuras, cada una con su propio
+diagnóstico antes de construirse.
 
 ## Fuera de alcance de esta ronda
 

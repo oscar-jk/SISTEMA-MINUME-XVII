@@ -52,7 +52,7 @@ async function cargar() {
   return data;
 }
 
-function abrirHojaAvance(tarea, alGuardar) {
+export function abrirHojaAvance(tarea, alGuardar) {
   const sugerido = Math.min(100, (tarea.progreso || 0) + 10) || 20;
   const div = document.createElement('div');
   div.className = 'hoja-avance';
@@ -94,7 +94,7 @@ function abrirHojaAvance(tarea, alGuardar) {
   });
 }
 
-async function enviarARevision(tarea) {
+export async function enviarARevision(tarea, alTerminar) {
   const { error } = await supabase.from('tareas').update({ estado: 'en_revision' }).eq('id', tarea.id);
   if (error) {
     mostrarAviso(mensajeError(error), 'error');
@@ -102,7 +102,7 @@ async function enviarARevision(tarea) {
   }
   tarea.estado = 'en_revision';
   mostrarAviso('Tarea enviada a revisión.', 'exito');
-  pintar();
+  (alTerminar || pintar)();
 }
 
 function tarjeta(tarea) {

@@ -440,3 +440,20 @@
 @media (min-width: 1024px) {
   .tablero-grid { grid-template-columns: repeat(6, 1fr); }
 }
+
+/* ----------------------------------------------------------------- checklist */
+
+.checklist-filtros { margin-bottom: 1rem; }
+.campo-buscar { width: 100%; margin-bottom: 0.75rem; }
+
+.checklist-grupo { margin-bottom: 2rem; }
+.checklist-grupo__cabecera {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+.checklist-grupo__cabecera .subtitulo { margin: 0; }
+.checklist__marca { width: 2rem; text-align: center; }
+.checklist__check { color: var(--ok); }
