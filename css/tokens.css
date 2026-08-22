@@ -25,9 +25,12 @@
   --warn: #B5791A;
   --danger: #A8412F;
 
-  /* Tipografía — dos familias, cinco tamaños en total */
-  --fuente-titulo: 'Fraunces', Georgia, 'Times New Roman', serif;
-  --fuente-texto: 'Source Sans 3', -apple-system, 'Segoe UI', sans-serif;
+  /* Tipografía — misma pareja que plerd.minerd.gob.do (Barlow + Public
+     Sans), para que SIRIO se lea como parte de la familia MINERD/PLERD.
+     El color sigue siendo navy+dorado propio de SIRIO, no el azul/morado
+     de PLERD — ver README, sección "Identidad visual". */
+  --fuente-titulo: 'Barlow', -apple-system, 'Segoe UI', sans-serif;
+  --fuente-texto: 'Public Sans', -apple-system, 'Segoe UI', sans-serif;
 
   --texto-xs: 0.8125rem;   /* metadatos, etiquetas */
   --texto-sm: 0.9375rem;   /* texto secundario */
@@ -35,8 +38,8 @@
   --texto-lg: 1.375rem;    /* subtítulos de sección */
   --texto-xl: 1.875rem;    /* títulos de pantalla */
 
-  --radio: 10px;
-  --radio-chico: 6px;
+  --radio: 12px;
+  --radio-chico: 8px;
   --sombra: 0 2px 10px rgba(10, 31, 56, 0.08);
   --toque-minimo: 44px;
 }

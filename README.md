@@ -13,6 +13,19 @@ consolidados en tiempo real, reportes/exportación, croquis público,
 planificación estratégica, hospedaje/regionales, auditoría completa y
 acreditación de delegados siguen sin construirse — ver "Fuera de alcance".
 
+## Identidad visual
+
+Tipografía tomada de [plerd.minerd.gob.do](https://plerd.minerd.gob.do)
+(el sitio del programa que sostiene a MINUME): **Barlow** para títulos
+(peso 800, el mismo par de familias que usa PLERD) y **Public Sans**
+para todo lo demás — reemplazan a Fraunces/Source Sans 3. El radio de
+esquina (`--radio`/`--radio-chico`, `css/tokens.css`) se alineó a los
+8–12px que usa PLERD en botones y tarjetas. El **color no se tomó de
+PLERD** (que usa azul/morado/ámbar de una plantilla MUI genérica):
+SIRIO mantiene su propio navy + dorado, ligado al nombre ("la estrella
+más brillante") y a "MINUME de Estrellas" — decisión explícita, no un
+descuido.
+
 Stack: HTML + CSS + JavaScript vanilla con módulos ES nativos. Sin
 framework, sin paso de build. Páginas HTML reales por módulo, no una SPA
 de una sola página — ver "Arquitectura" abajo. Supabase para datos,
