@@ -34,31 +34,98 @@ async function fetchCargos() {
 
 // --- Personas -------------------------------------------------------------
 
+// Crear persona y asignarle cargo son, en RLS, dos escrituras separadas
+// (personas.insert / cargos.update|insert) — no hay transacción cruzada
+// posible desde el cliente. Si el segundo paso falla, la persona ya
+// existe y ahora es visible igual (0022: personas_select_sin_cargo), así
+// que el admin puede reintentar la asignación desde aquí mismo sin perder
+// el registro ni tener que buscarlo a ciegas.
+async function crearPersonaYAsignar(datosPersona, cargoElegido, datosCargoNuevo) {
+  const { data: persona, error: errorPersona } = await supabase
+    .from('personas').insert(datosPersona).select().single();
+  if (errorPersona) throw errorPersona;
+
+  if (cargoElegido === '__nuevo__') {
+    const { error } = await supabase.from('cargos').insert({ ...datosCargoNuevo, persona_id: persona.id });
+    if (error) throw new Error(`Persona creada, pero el cargo nuevo no se pudo crear: ${mensajeError(error)}`);
+  } else if (cargoElegido) {
+    const { error } = await supabase.from('cargos').update({ persona_id: persona.id }).eq('id', cargoElegido);
+    if (error) throw new Error(`Persona creada, pero no se pudo asignar el cargo: ${mensajeError(error)}`);
+  }
+  return persona;
+}
+
 async function pintarPersonas(el) {
+  const [personas, cargosVacantes] = await Promise.all([
+    fetchPersonas(),
+    fetchCargos().then((cargos) => cargos.filter((c) => !c.persona_id && c.activo)),
+  ]);
+
   el.innerHTML = `
-    <form class="formulario formulario--en-linea" data-form-persona>
-      <input name="nombre" placeholder="Nombre" required />
-      <input name="apellido" placeholder="Apellido" required />
-      <input name="documento" placeholder="Documento (opcional)" />
-      <input name="correo" type="email" placeholder="Correo (opcional)" />
-      <input name="telefono" placeholder="Teléfono (opcional)" />
-      <button type="submit" class="boton boton--primario">${icono('mas', { tamano: 16 })} Añadir persona</button>
+    <form class="formulario" data-form-persona>
+      <div class="formulario__fila">
+        <label class="campo"><span>Nombre</span><input name="nombre" required /></label>
+        <label class="campo"><span>Apellido</span><input name="apellido" required /></label>
+      </div>
+      <div class="formulario__fila">
+        <label class="campo"><span>Documento (opcional)</span><input name="documento" /></label>
+        <label class="campo"><span>Correo (opcional)</span><input name="correo" type="email" /></label>
+        <label class="campo"><span>Teléfono (opcional)</span><input name="telefono" /></label>
+      </div>
+      <label class="campo">
+        <span>Cargo a asignar</span>
+        <select name="cargo_elegido" data-cargo-elegido>
+          <option value="">Sin asignar por ahora (queda vacante)</option>
+          <option value="__nuevo__">+ Crear un cargo nuevo para esta persona</option>
+          ${opcionesSelect(cargosVacantes, { valor: 'id', etiqueta: (c) => `${c.nombre}${c.division ? ` (${c.division.toUpperCase()})` : ''}` })}
+        </select>
+      </label>
+      <div data-cargo-nuevo hidden>
+        <div class="formulario__fila">
+          <label class="campo"><span>Nombre del cargo</span><input name="cargo_nombre" /></label>
+          <label class="campo"><span>Tipo</span><select name="cargo_tipo">${opcionesSelect(TIPOS_CARGO, { valor: 'v', etiqueta: 't' })}</select></label>
+        </div>
+        <label class="campo"><span>Superior jerárquico</span><select name="cargo_superior_id"></select></label>
+      </div>
+      <button type="submit" class="boton boton--primario">${icono('mas', { tamano: 16 })} Crear persona</button>
     </form>
     <div data-lista></div>
   `;
+
+  // El selector de superior necesita TODOS los cargos, no solo vacantes —
+  // se pinta aparte para no repetir la consulta.
+  const cargosTodos = await fetchCargos();
+  const selectSuperior = el.querySelector('[name="cargo_superior_id"]');
+  selectSuperior.innerHTML = opcionesSelect(cargosTodos, {
+    valor: 'id', etiqueta: (c) => `${nombreCompleto(c.persona)} · ${c.nombre}`, vacio: 'Sin superior (raíz)',
+  });
+
+  const selectCargo = el.querySelector('[data-cargo-elegido]');
+  const bloqueCargoNuevo = el.querySelector('[data-cargo-nuevo]');
+  selectCargo.addEventListener('change', () => {
+    bloqueCargoNuevo.hidden = selectCargo.value !== '__nuevo__';
+  });
+
   el.querySelector('[data-form-persona]').addEventListener('submit', async (e) => {
     e.preventDefault();
     const datos = datosFormulario(e.target);
-    const { error } = await supabase.from('personas').insert(datos);
-    if (error) { mostrarAviso(mensajeError(error), 'error'); return; }
-    mostrarAviso('Persona añadida.', 'exito');
-    e.target.reset();
-    await pintarPersonas(el);
+    const datosPersona = { nombre: datos.nombre, apellido: datos.apellido, documento: datos.documento, correo: datos.correo, telefono: datos.telefono };
+    const datosCargoNuevo = datos.cargo_elegido === '__nuevo__'
+      ? { nombre: datos.cargo_nombre, tipo: datos.cargo_tipo, superior_id: datos.cargo_superior_id, evaluador_id: datos.cargo_superior_id }
+      : null;
+    try {
+      await crearPersonaYAsignar(datosPersona, datos.cargo_elegido, datosCargoNuevo);
+      mostrarAviso('Persona creada.', 'exito');
+      e.target.reset();
+      await pintarPersonas(el);
+    } catch (err) {
+      mostrarAviso(mensajeError(err), 'error');
+      await pintarPersonas(el);
+    }
   });
 
-  const personas = await fetchPersonas();
   const tabla = crearTabla([
-    { clave: 'nombre', titulo: 'Nombre', render: (p) => escapeHtml(nombreCompleto(p)) },
+    { clave: 'nombre', titulo: 'Nombre', render: (p) => nombreCompleto(p) },
     { clave: 'documento', titulo: 'Documento' },
     { clave: 'correo', titulo: 'Correo' },
     { clave: 'telefono', titulo: 'Teléfono' },
@@ -134,7 +201,7 @@ async function pintarCargos(el) {
     { clave: 'nombre', titulo: 'Cargo' },
     { clave: 'tipo', titulo: 'Tipo' },
     { clave: 'division', titulo: 'División', render: (c) => (c.division || '—').toUpperCase() },
-    { clave: 'persona', titulo: 'Ocupante', render: (c) => (c.persona ? escapeHtml(nombreCompleto(c.persona)) : '<em>Vacante</em>') },
+    { clave: 'persona', titulo: 'Ocupante', html: true, render: (c) => (c.persona ? escapeHtml(nombreCompleto(c.persona)) : '<em>Vacante</em>') },
     { clave: 'activo', titulo: 'Activo', render: (c) => (c.activo ? 'Sí' : 'No') },
   ], cargos);
   const lista = el.querySelector('[data-lista]');

@@ -8,7 +8,8 @@ import { abrirModal } from '../ui/modal.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 import { crearTabla } from '../ui/tabla.js';
 import { datosFormulario } from '../ui/formulario.js';
-import { nombreCompleto, escapeHtml } from '../utils/formato.js';
+import { nombreCompleto } from '../utils/formato.js';
+import { hoyISO } from '../utils/fechas.js';
 import { puedeAsignar } from '../core/permisos.js';
 
 let contenedor = null;
@@ -64,8 +65,9 @@ async function eliminarPendiente(fila) {
 
 async function pintarMiAsistencia(el) {
   const filas = await fetchMiHistorial();
-  const hoyAbierta = filas.find((f) => f.fecha === new Date().toISOString().slice(0, 10) && f.tipo === 'entrada' && f.estado !== 'anulado')
-    && !filas.find((f) => f.fecha === new Date().toISOString().slice(0, 10) && f.tipo === 'salida' && f.estado !== 'anulado');
+  const hoy = hoyISO();
+  const hoyAbierta = filas.find((f) => f.fecha === hoy && f.tipo === 'entrada' && f.estado !== 'anulado')
+    && !filas.find((f) => f.fecha === hoy && f.tipo === 'salida' && f.estado !== 'anulado');
 
   el.innerHTML = `
     <div class="tarjeta-tarea__acciones" style="margin-bottom:1rem">
@@ -148,7 +150,7 @@ async function pintarAprobacion(el) {
   }
 
   const tabla = crearTabla([
-    { clave: 'persona', titulo: 'Persona', render: (f) => escapeHtml(nombreCompleto(f.cargo?.persona)) },
+    { clave: 'persona', titulo: 'Persona', render: (f) => nombreCompleto(f.cargo?.persona) },
     { clave: 'fecha', titulo: 'Fecha' },
     { clave: 'tipo', titulo: 'Tipo', render: (f) => (f.tipo === 'entrada' ? 'Entrada' : 'Salida') },
     { clave: 'hora', titulo: 'Hora', render: (f) => f.hora.slice(0, 5) },

@@ -45,10 +45,10 @@ async function pintar(filtros) {
   }
   const tabla = crearTabla([
     { clave: 'creado_en', titulo: 'Fecha', render: (f) => new Date(f.creado_en).toLocaleString('es-DO') },
-    { clave: 'accion', titulo: 'Acción', render: (f) => escapeHtml(ACCION_LABEL[f.accion] || f.accion) },
+    { clave: 'accion', titulo: 'Acción', render: (f) => ACCION_LABEL[f.accion] || f.accion },
     { clave: 'tabla', titulo: 'Tabla' },
-    { clave: 'quien', titulo: 'Quién', render: (f) => (f.cargo ? escapeHtml(`${f.cargo.persona?.nombre ?? ''} ${f.cargo.persona?.apellido ?? ''}`.trim() || f.cargo.nombre) : '—') },
-    { clave: 'detalle', titulo: 'Detalle', render: (f) => (f.detalle ? `<code>${escapeHtml(JSON.stringify(f.detalle))}</code>` : '—') },
+    { clave: 'quien', titulo: 'Quién', render: (f) => (f.cargo ? (`${f.cargo.persona?.nombre ?? ''} ${f.cargo.persona?.apellido ?? ''}`.trim() || f.cargo.nombre) : '—') },
+    { clave: 'detalle', titulo: 'Detalle', html: true, render: (f) => (f.detalle ? `<code>${escapeHtml(JSON.stringify(f.detalle))}</code>` : '—') },
   ], filas);
   cuerpo.replaceChildren(tabla);
 }

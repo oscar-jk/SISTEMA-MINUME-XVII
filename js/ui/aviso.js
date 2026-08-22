@@ -1,4 +1,5 @@
 import { icono } from './icono.js';
+import { escapeHtml } from '../utils/formato.js';
 
 let contenedorToasts = null;
 
@@ -17,7 +18,7 @@ export function mostrarAviso(mensaje, tipo = 'info', duracionMs = 4000) {
   const toast = document.createElement('div');
   toast.className = `toast toast--${tipo}`;
   const iconoNombre = tipo === 'error' ? 'alerta' : tipo === 'exito' ? 'check-circulo' : 'reloj';
-  toast.innerHTML = `${icono(iconoNombre, { tamano: 18 })}<span>${mensaje}</span>`;
+  toast.innerHTML = `${icono(iconoNombre, { tamano: 18 })}<span>${escapeHtml(mensaje)}</span>`;
   cont.appendChild(toast);
 
   requestAnimationFrame(() => toast.classList.add('toast--visible'));

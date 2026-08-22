@@ -1,4 +1,5 @@
 import { icono } from './icono.js';
+import { escapeHtml } from '../utils/formato.js';
 
 // Abre una hoja modal (bottom sheet en móvil, diálogo centrado en escritorio).
 // `contenido` puede ser un string HTML o un HTMLElement.
@@ -15,7 +16,7 @@ export function abrirModal({ titulo, contenido, ancho = 'normal' }) {
 
   const header = document.createElement('div');
   header.className = 'modal-header';
-  header.innerHTML = `<h2>${titulo}</h2><button type="button" class="modal-cerrar" aria-label="Cerrar">${icono('cerrar', { tamano: 20 })}</button>`;
+  header.innerHTML = `<h2>${escapeHtml(titulo)}</h2><button type="button" class="modal-cerrar" aria-label="Cerrar">${icono('cerrar', { tamano: 20 })}</button>`;
 
   const cuerpo = document.createElement('div');
   cuerpo.className = 'modal-cuerpo';

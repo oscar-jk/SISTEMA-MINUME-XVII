@@ -7,7 +7,6 @@ import { icono } from '../ui/icono.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 import { datosFormulario, opcionesSelect } from '../ui/formulario.js';
 import { crearTabla } from '../ui/tabla.js';
-import { escapeHtml } from '../utils/formato.js';
 
 let contenedor = null;
 let pestanaActiva = 'propiedades';
@@ -74,10 +73,10 @@ async function pintarEspacios(el) {
   });
   el.querySelector('[data-lista]').replaceChildren(crearTabla([
     { clave: 'nombre', titulo: 'Nombre' },
-    { clave: 'propiedad', titulo: 'Propiedad', render: (f) => escapeHtml(f.propiedad?.nombre ?? '—') },
+    { clave: 'propiedad', titulo: 'Propiedad', render: (f) => f.propiedad?.nombre ?? '—' },
     { clave: 'piso', titulo: 'Piso' },
-    { clave: 'tipo', titulo: 'Tipo', render: (f) => escapeHtml(f.tipo?.nombre ?? '—') },
-    { clave: 'estado', titulo: 'Estado', render: (f) => escapeHtml(f.estado?.nombre ?? '—') },
+    { clave: 'tipo', titulo: 'Tipo', render: (f) => f.tipo?.nombre ?? '—' },
+    { clave: 'estado', titulo: 'Estado', render: (f) => f.estado?.nombre ?? '—' },
     { clave: 'capacidad', titulo: 'Capacidad' },
   ], filas));
 }

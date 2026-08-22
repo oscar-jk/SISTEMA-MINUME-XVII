@@ -1,6 +1,6 @@
 // Sesión: login por correo + código de acceso, sin registro público.
 import { supabase } from './supabase.js';
-import { set } from './store.js';
+import { set, getEstado } from './store.js';
 
 async function cargarPerfil(userId) {
   const { data: usuario, error: eu } = await supabase
@@ -13,24 +13,32 @@ async function cargarPerfil(userId) {
     throw new Error('Esta cuenta no tiene un perfil asignado en MINUME XVII. Contacta al administrador.');
   }
 
-  const { data: cargo, error: ec } = await supabase
-    .from('cargos')
-    .select('id, nombre, tipo, division, subsecretaria, comision, superior_id')
-    .eq('persona_id', usuario.persona_id)
-    .eq('activo', true)
-    .order('creado_en')
-    .limit(1)
-    .maybeSingle();
+  // cargo_actual() (RLS, ver 0023) ya resuelve cuál de los cargos de esta
+  // persona está activo — se le pregunta directamente en vez de repetir su
+  // lógica aquí, para no poder desincronizarse de lo que la base decide.
+  const [{ data: cargos, error: ec }, { data: idActivo, error: eActivo }] = await Promise.all([
+    supabase
+      .from('cargos')
+      .select('id, nombre, tipo, division, subsecretaria, comision, superior_id')
+      .eq('persona_id', usuario.persona_id)
+      .eq('activo', true)
+      .order('creado_en'),
+    supabase.rpc('cargo_actual'),
+  ]);
 
   if (ec) throw ec;
-  if (!cargo) {
+  if (eActivo) throw eActivo;
+  if (!cargos || cargos.length === 0) {
     throw new Error('Esta persona no tiene un cargo activo asignado. Contacta al administrador.');
   }
+
+  const cargo = cargos.find((c) => c.id === idActivo) ?? cargos[0];
 
   return {
     persona: usuario.personas,
     esSuperAdmin: usuario.es_super_admin,
     cargo,
+    cargos,
   };
 }
 
@@ -73,4 +81,14 @@ export async function iniciarSesion(correo, codigoAcceso) {
 export async function cerrarSesion() {
   await supabase.auth.signOut();
   set({ sesion: null });
+}
+
+// Solo relevante para quien ocupa más de un cargo a la vez (ver 0023) — el
+// conmutador en shell.js solo se muestra cuando sesion.cargos.length > 1.
+export async function cambiarCargoActivo(cargoId) {
+  const { error } = await supabase.rpc('fn_establecer_cargo_activo', { p_cargo: cargoId });
+  if (error) throw error;
+  const { sesion } = getEstado();
+  const perfil = await cargarPerfil(sesion.user.id);
+  set({ sesion: { user: sesion.user, ...perfil } });
 }

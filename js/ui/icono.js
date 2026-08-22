@@ -23,6 +23,7 @@ const TRAZOS = {
   adjunto: '<path d="M15.5 6.5 8 14a2.5 2.5 0 0 0 3.5 3.5l7-7a4 4 0 0 0-5.6-5.6l-7 7A5.5 5.5 0 0 0 13.7 19.7"/>',
   edificio: '<path d="M5 21V4.5A1.5 1.5 0 0 1 6.5 3h6A1.5 1.5 0 0 1 14 4.5V21"/><path d="M14 10.5h4A1.5 1.5 0 0 1 19.5 12V21"/><path d="M8 7h2M8 10.5h2M8 14h2M15.5 13.5h1.5M15.5 17h1.5"/><path d="M3 21h18"/>',
   organigrama: '<circle cx="12" cy="4.5" r="2"/><circle cx="6" cy="14" r="2"/><circle cx="18" cy="14" r="2"/><path d="M12 6.5v3M12 9.5H6v2.5M12 9.5h6v2.5M6 16v3.5M18 16v3.5"/>',
+  tablero: '<rect x="3.5" y="3.5" width="8" height="7" rx="1.2"/><rect x="12.5" y="3.5" width="8" height="4.5" rx="1.2"/><rect x="12.5" y="9" width="8" height="11.5" rx="1.2"/><rect x="3.5" y="12" width="8" height="8.5" rx="1.2"/>',
 };
 
 export function icono(nombre, { tamano = 20, clase = '' } = {}) {

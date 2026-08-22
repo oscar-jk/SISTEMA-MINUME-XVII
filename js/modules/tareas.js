@@ -171,17 +171,23 @@ function pintar() {
   }
 }
 
-export async function render(el) {
+const FILTROS_VALIDOS = new Set(['todas', 'vencidas', 'en_curso', 'en_revision', 'completada']);
+
+// filtroInicial viene del tablero (?filtro=vencidas, por ejemplo) — un
+// enlace directo a la pestaña correspondiente en vez de aterrizar siempre
+// en "Todas" y obligar a un segundo clic.
+export async function render(el, filtroInicial) {
   contenedor = el;
+  filtroActivo = FILTROS_VALIDOS.has(filtroInicial) ? filtroInicial : 'todas';
   el.innerHTML = `
     <div class="vista-cabecera">
       <h1>Mis tareas</h1>
       <div class="filtros-chip" data-filtros>
-        <button type="button" class="chip chip--activo" data-filtro="todas">Todas</button>
-        <button type="button" class="chip" data-filtro="vencidas">Vencidas</button>
-        <button type="button" class="chip" data-filtro="en_curso">En curso</button>
-        <button type="button" class="chip" data-filtro="en_revision">En revisión</button>
-        <button type="button" class="chip" data-filtro="completada">Completadas</button>
+        <button type="button" class="chip${filtroActivo === 'todas' ? ' chip--activo' : ''}" data-filtro="todas">Todas</button>
+        <button type="button" class="chip${filtroActivo === 'vencidas' ? ' chip--activo' : ''}" data-filtro="vencidas">Vencidas</button>
+        <button type="button" class="chip${filtroActivo === 'en_curso' ? ' chip--activo' : ''}" data-filtro="en_curso">En curso</button>
+        <button type="button" class="chip${filtroActivo === 'en_revision' ? ' chip--activo' : ''}" data-filtro="en_revision">En revisión</button>
+        <button type="button" class="chip${filtroActivo === 'completada' ? ' chip--activo' : ''}" data-filtro="completada">Completadas</button>
       </div>
     </div>
     <div class="lista-tareas" data-lista><p class="estado-vacio">Cargando…</p></div>

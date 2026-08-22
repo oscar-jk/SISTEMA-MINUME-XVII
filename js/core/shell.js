@@ -2,11 +2,13 @@
 // escritorio, nav móvil, banner de conexión y compuerta de sesión. Cada
 // página solo declara los placeholders vacíos (#app-header, #app-nav-movil,
 // #banner-conexion) y llama a montarShell() antes de pintar lo suyo.
-import { iniciar, cerrarSesion } from './sesion.js';
+import { iniciar, cerrarSesion, cambiarCargoActivo } from './sesion.js';
 import { getEstado, subscribe } from './store.js';
 import './cola.js';
 import { icono } from '../ui/icono.js';
 import { puedeAsignar, esAdmin } from './permisos.js';
+import { escapeHtml } from '../utils/formato.js';
+import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 
 // Un solo punto de verdad para la navegación. Nuevas páginas se agregan
 // aquí, no se duplican a mano en cada .html. Con 11 destinos, el header y
@@ -14,6 +16,7 @@ import { puedeAsignar, esAdmin } from './permisos.js';
 // administración) cuelga de un único enlace "Admin" y su propia
 // sub-navegación en cada página admin-*.html (ver pintarSubnavAdmin()).
 const ENLACES_NAV = [
+  { href: '/tablero.html', texto: 'Tablero', iconoNombre: 'tablero' },
   { href: '/mis-tareas.html', texto: 'Mis tareas', iconoNombre: 'check-circulo' },
   { href: '/calendario.html', texto: 'Calendario', iconoNombre: 'calendario' },
   { href: '/bandeja.html', texto: 'Bandeja', iconoNombre: 'bandeja', requiere: 'asignar' },
@@ -58,12 +61,22 @@ function pintarNav(sesion) {
       <span>${e.texto}</span>
     </a>`).join('');
 
+  // El conmutador de cargo solo aparece para quien ocupa más de uno a la
+  // vez (ver 0023_cargo_activo.sql) — la inmensa mayoría solo tiene uno y
+  // no ve ningún cambio en el header.
+  const tieneVariosCargos = sesion.cargos && sesion.cargos.length > 1;
+  const usuarioHtml = tieneVariosCargos
+    ? `<select id="selector-cargo" class="selector-cargo" title="Cambiar de cargo activo">
+        ${sesion.cargos.map((c) => `<option value="${c.id}"${c.id === sesion.cargo.id ? ' selected' : ''}>${escapeHtml(c.nombre)}</option>`).join('')}
+      </select>`
+    : `<span>${escapeHtml(sesion.persona.nombre)} · ${escapeHtml(sesion.cargo.nombre)}</span>`;
+
   const header = document.getElementById('app-header');
   header.innerHTML = `
     <div class="app-header__marca">SIRIO <span>XVII</span></div>
     <nav class="app-nav">${html('escritorio')}</nav>
     <div class="app-header__usuario">
-      <span>${sesion.persona.nombre} · ${sesion.cargo.nombre}</span>
+      ${usuarioHtml}
       <button id="boton-salir" type="button" class="boton-icono" title="Cerrar sesión">${icono('salir', { tamano: 18 })}</button>
     </div>
   `;
@@ -73,6 +86,21 @@ function pintarNav(sesion) {
     await cerrarSesion();
     location.href = '/index.html';
   });
+
+  const selectorCargo = header.querySelector('#selector-cargo');
+  if (selectorCargo) {
+    selectorCargo.addEventListener('change', async () => {
+      const elegido = selectorCargo.value;
+      selectorCargo.disabled = true;
+      try {
+        await cambiarCargoActivo(elegido);
+        mostrarAviso('Cargo activo cambiado.', 'exito');
+      } catch (err) {
+        mostrarAviso(mensajeError(err), 'error');
+        selectorCargo.disabled = false;
+      }
+    });
+  }
 }
 
 function pintarBannerConexion() {

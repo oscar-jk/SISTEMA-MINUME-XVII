@@ -7,6 +7,7 @@ import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 import { datosFormulario, opcionesSelect } from '../ui/formulario.js';
 import { crearTabla } from '../ui/tabla.js';
 import { nombreCompleto, escapeHtml } from '../utils/formato.js';
+import { hoyISO } from '../utils/fechas.js';
 import { montarPlano } from './plano-editor.js';
 import { puedeAsignar } from '../core/permisos.js';
 
@@ -87,7 +88,7 @@ async function generarTarea(asignacion) {
 
 async function pintarAsignaciones(el, espacios) {
   const { sesion } = getEstado();
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = hoyISO();
   const cargos = puedeAsignar(sesion) ? await fetchCargosVisibles() : [];
   const asignaciones = await fetchAsignaciones(hoy);
 
@@ -126,8 +127,8 @@ async function pintarAsignaciones(el, espacios) {
   }
 
   const tabla = crearTabla([
-    { clave: 'espacio', titulo: 'Espacio', render: (a) => escapeHtml(a.espacio?.nombre ?? '—') },
-    { clave: 'persona', titulo: 'Persona', render: (a) => escapeHtml(nombreCompleto(a.cargo?.persona)) },
+    { clave: 'espacio', titulo: 'Espacio', render: (a) => a.espacio?.nombre ?? '—' },
+    { clave: 'persona', titulo: 'Persona', render: (a) => nombreCompleto(a.cargo?.persona) },
     { clave: 'fecha', titulo: 'Fecha' },
     { clave: 'horario', titulo: 'Horario', render: (a) => `${a.hora_inicio}–${a.hora_fin}` },
   ], asignaciones);
