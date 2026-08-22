@@ -8,11 +8,12 @@ export const ESTADO_TAREA_LABEL = {
 };
 
 export const ESTADO_ACTIVIDAD_LABEL = {
-  planificada: 'Planificada',
-  confirmada: 'Confirmada',
+  no_iniciada: 'No iniciada',
+  en_preparacion: 'En preparación',
   en_curso: 'En curso',
-  realizada: 'Realizada',
+  completada: 'Completada',
   cancelada: 'Cancelada',
+  no_aplica: 'No aplica',
 };
 
 export const PRIORIDAD_LABEL = {

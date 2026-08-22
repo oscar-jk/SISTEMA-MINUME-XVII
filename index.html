@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>MINUME XVII · Estrellas</title>
-  <meta name="description" content="Calendario y gestión de tareas del equipo organizador de MINUME XVII." />
+  <title>SIRIO XVII · Entrar</title>
+  <meta name="description" content="SIRIO XVII — sistema de gestión de MINUME XVII, edición de Estrellas." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -14,12 +14,10 @@
   <link rel="stylesheet" href="/css/vistas.css" />
 </head>
 <body>
-  <div id="banner-conexion" class="banner-conexion" hidden></div>
-
-  <div id="pantalla-login" class="pantalla-login" hidden>
+  <div class="pantalla-login">
     <div class="pantalla-login__tarjeta">
-      <p class="pantalla-login__marca">MINUME <span>XVII</span></p>
-      <p class="pantalla-login__subtitulo">Edición de Estrellas · Calendario y tareas</p>
+      <p class="pantalla-login__marca">SIRIO <span>XVII</span></p>
+      <p class="pantalla-login__subtitulo">MINUME XVII · Edición de Estrellas</p>
       <form id="form-login" class="formulario">
         <label class="campo">
           <span>Correo</span>
@@ -35,21 +33,6 @@
     </div>
   </div>
 
-  <div id="app-shell" class="app-shell" hidden>
-    <header class="app-header">
-      <div class="app-header__marca">MINUME <span>XVII</span></div>
-      <nav class="app-nav" id="app-nav"></nav>
-      <div class="app-header__usuario">
-        <span id="app-usuario-nombre"></span>
-        <button id="boton-salir" type="button" class="boton-icono" title="Cerrar sesión"></button>
-      </div>
-    </header>
-
-    <nav class="app-nav-movil" id="app-nav-movil"></nav>
-
-    <main id="app" class="app-contenido"></main>
-  </div>
-
-  <script type="module" src="/js/main.js"></script>
+  <script type="module" src="/js/paginas/login.js"></script>
 </body>
 </html>

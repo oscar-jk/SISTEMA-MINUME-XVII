@@ -5,7 +5,6 @@ import { encolarAvance } from '../core/cola.js';
 import { abrirModal } from '../ui/modal.js';
 import { icono } from '../ui/icono.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
-import { navegar } from '../core/router.js';
 import {
   estaVencida, etiquetaPlazo,
 } from '../utils/fechas.js';
@@ -149,7 +148,7 @@ function tarjeta(tarea) {
   verMas.type = 'button';
   verMas.className = 'boton boton--fantasma';
   verMas.textContent = 'Ver detalle';
-  verMas.addEventListener('click', () => navegar(`#/tarea/${tarea.id}`));
+  verMas.addEventListener('click', () => { location.href = `/tarea.html?id=${tarea.id}`; });
   acciones.appendChild(verMas);
 
   return art;

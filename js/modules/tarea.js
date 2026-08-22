@@ -11,6 +11,7 @@ import {
 import {
   puedeRegistrarAvance, puedeEnviarRevision, puedeAprobarODevolver,
 } from '../core/permisos.js';
+import { montarEvidencia } from './evidencia-widget.js';
 
 let contenedor = null;
 let idTarea = null;
@@ -37,6 +38,20 @@ async function cargarAvances(id) {
     .eq('tarea_id', id)
     .order('fecha', { ascending: true });
   if (error) throw error;
+  return data;
+}
+
+async function cargarReasignaciones(id) {
+  const { data, error } = await supabase
+    .from('historial_reasignacion_tarea')
+    .select(`
+      id, campo, cambiado_en,
+      anterior:cargos!historial_reasignacion_tarea_cargo_anterior_id_fkey(nombre, persona:personas(nombre, apellido)),
+      nuevo:cargos!historial_reasignacion_tarea_cargo_nuevo_id_fkey(nombre, persona:personas(nombre, apellido))
+    `)
+    .eq('tarea_id', id)
+    .order('cambiado_en', { ascending: false });
+  if (error) return [];
   return data;
 }
 
@@ -146,8 +161,11 @@ async function pintar() {
   const { sesion } = getEstado();
   let tarea;
   let avances;
+  let reasignaciones;
   try {
-    [tarea, avances] = await Promise.all([cargarTarea(idTarea), cargarAvances(idTarea)]);
+    [tarea, avances, reasignaciones] = await Promise.all([
+      cargarTarea(idTarea), cargarAvances(idTarea), cargarReasignaciones(idTarea),
+    ]);
   } catch (err) {
     contenedor.innerHTML = `<p class="estado-vacio">No se pudo cargar la tarea. ${escapeHtml(mensajeError(err))}</p>`;
     return;
@@ -183,9 +201,28 @@ async function pintar() {
     <ul class="lista-avances">
       ${avances.length ? avances.map(filaAvance).join('') : '<li class="estado-vacio">Todavía no hay avances registrados.</li>'}
     </ul>
+
+    ${reasignaciones.length ? `
+      <h2 class="subtitulo">Historial de reasignación</h2>
+      <ul class="lista-avances">
+        ${reasignaciones.map((r) => `
+          <li class="avance">
+            <p class="avance__nota">
+              ${r.campo === 'responsable' ? 'Responsable' : 'Supervisor'} cambió de
+              <strong>${escapeHtml(r.anterior ? nombreCompleto(r.anterior.persona) : 'sin asignar')}</strong> a
+              <strong>${escapeHtml(r.nuevo ? nombreCompleto(r.nuevo.persona) : 'sin asignar')}</strong>
+              — ${new Date(r.cambiado_en).toLocaleDateString('es-DO')}
+            </p>
+          </li>
+        `).join('')}
+      </ul>
+    ` : ''}
+
+    <div data-evidencia></div>
   `;
 
   contenedor.querySelector('[data-volver]').addEventListener('click', () => history.back());
+  montarEvidencia(contenedor.querySelector('[data-evidencia]'), { tarea });
 
   const acciones = contenedor.querySelector('[data-acciones]');
   const refrescar = () => pintar();

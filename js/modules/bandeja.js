@@ -1,6 +1,5 @@
 import { supabase } from '../core/supabase.js';
 import { getEstado } from '../core/store.js';
-import { navegar } from '../core/router.js';
 import { icono } from '../ui/icono.js';
 import { abrirModal } from '../ui/modal.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
@@ -77,7 +76,7 @@ function fila(tarea) {
   const vencida = estaVencida(tarea);
   const tr = document.createElement('tr');
   tr.innerHTML = `
-    <td><a href="#/tarea/${tarea.id}">${escapeHtml(tarea.titulo)}</a>${tarea.actividad ? `<div class="texto-mudo texto-pequeno">${escapeHtml(tarea.actividad.codigo)}</div>` : ''}</td>
+    <td><a href="/tarea.html?id=${tarea.id}">${escapeHtml(tarea.titulo)}</a>${tarea.actividad ? `<div class="texto-mudo texto-pequeno">${escapeHtml(tarea.actividad.codigo)}</div>` : ''}</td>
     <td><span class="${'estado estado--' + tarea.estado.replace(/_/g, '-')}">${ESTADO_TAREA_LABEL[tarea.estado]}</span></td>
     <td>${escapeHtml(nombreCompleto(tarea.responsable?.persona))}</td>
     <td class="${vencida ? 'texto-danger' : ''}">${etiquetaPlazo(tarea)}</td>
@@ -101,7 +100,7 @@ function fila(tarea) {
     const verBtn = document.createElement('button');
     verBtn.className = 'boton boton--fantasma boton--pequeno';
     verBtn.textContent = 'Ver';
-    verBtn.addEventListener('click', () => navegar(`#/tarea/${tarea.id}`));
+    verBtn.addEventListener('click', () => { location.href = `/tarea.html?id=${tarea.id}`; });
     acciones.appendChild(verBtn);
   }
   return tr;

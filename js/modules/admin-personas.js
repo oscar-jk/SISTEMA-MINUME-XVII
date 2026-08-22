@@ -1,9 +1,13 @@
+// Personas y cargos. Gestionable por cualquier jefe de rama (puede_asignar()),
+// no solo el super admin — cada quien dentro de su propia rama, según RLS.
 import { supabase } from '../core/supabase.js';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../config.js';
+import { getEstado } from '../core/store.js';
+import { pintarSubnavAdmin } from '../core/shell.js';
 import { icono } from '../ui/icono.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 import { datosFormulario, opcionesSelect } from '../ui/formulario.js';
 import { crearTabla } from '../ui/tabla.js';
+import { abrirModal } from '../ui/modal.js';
 import { nombreCompleto, escapeHtml } from '../utils/formato.js';
 
 let contenedor = null;
@@ -27,12 +31,6 @@ async function fetchCargos() {
     .order('nombre');
   return data || [];
 }
-async function fetchPersonasSinCuenta() {
-  const { data } = await supabase
-    .from('personas')
-    .select('id, nombre, apellido, correo, usuarios(id)');
-  return (data || []).filter((p) => !p.usuarios || p.usuarios.length === 0);
-}
 
 // --- Personas -------------------------------------------------------------
 
@@ -41,6 +39,7 @@ async function pintarPersonas(el) {
     <form class="formulario formulario--en-linea" data-form-persona>
       <input name="nombre" placeholder="Nombre" required />
       <input name="apellido" placeholder="Apellido" required />
+      <input name="documento" placeholder="Documento (opcional)" />
       <input name="correo" type="email" placeholder="Correo (opcional)" />
       <input name="telefono" placeholder="Teléfono (opcional)" />
       <button type="submit" class="boton boton--primario">${icono('mas', { tamano: 16 })} Añadir persona</button>
@@ -60,6 +59,7 @@ async function pintarPersonas(el) {
   const personas = await fetchPersonas();
   const tabla = crearTabla([
     { clave: 'nombre', titulo: 'Nombre', render: (p) => escapeHtml(nombreCompleto(p)) },
+    { clave: 'documento', titulo: 'Documento' },
     { clave: 'correo', titulo: 'Correo' },
     { clave: 'telefono', titulo: 'Teléfono' },
     { clave: 'activa', titulo: 'Activa', render: (p) => (p.activa ? 'Sí' : 'No') },
@@ -68,6 +68,30 @@ async function pintarPersonas(el) {
 }
 
 // --- Cargos -----------------------------------------------------------------
+
+function abrirModalSustitucion(cargo, personas, alTerminar) {
+  const div = document.createElement('div');
+  div.innerHTML = `
+    <p class="texto-mudo">Sustituye al titular de <strong>${escapeHtml(cargo.nombre)}</strong>. Las tareas abiertas de este cargo quedan automáticamente con el nuevo titular; el historial de ${escapeHtml(nombreCompleto(cargo.persona))} se conserva íntegro.</p>
+    <form class="formulario" data-form-sustituir>
+      <label class="campo"><span>Persona nueva</span><select name="persona_nueva" required>${opcionesSelect(personas, { valor: 'id', etiqueta: nombreCompleto, vacio: 'Elige una persona' })}</select></label>
+      <label class="campo"><span>Motivo</span><textarea name="motivo" rows="3" required></textarea></label>
+      <button type="submit" class="boton boton--primario boton--ancho">Sustituir titular</button>
+    </form>
+  `;
+  const { cerrar } = abrirModal({ titulo: 'Sustituir titular', contenido: div, ancho: 'angosto' });
+  div.querySelector('[data-form-sustituir]').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const datos = datosFormulario(e.target);
+    const { error } = await supabase.rpc('fn_sustituir_titular', {
+      p_cargo: cargo.id, p_persona_nueva: datos.persona_nueva, p_motivo: datos.motivo,
+    });
+    if (error) { mostrarAviso(mensajeError(error), 'error'); return; }
+    mostrarAviso('Titular sustituido.', 'exito');
+    cerrar();
+    alTerminar();
+  });
+}
 
 async function pintarCargos(el) {
   const [personas, cargos] = await Promise.all([fetchPersonas(), fetchCargos()]);
@@ -101,6 +125,11 @@ async function pintarCargos(el) {
     await pintarCargos(el);
   });
 
+  const ocupados = cargos.filter((c) => c.persona_id).length;
+  const cobertura = document.createElement('p');
+  cobertura.className = 'texto-mudo';
+  cobertura.textContent = `Cobertura: ${ocupados}/${cargos.length} cargos ocupados (${cargos.length - ocupados} vacantes).`;
+
   const tabla = crearTabla([
     { clave: 'nombre', titulo: 'Cargo' },
     { clave: 'tipo', titulo: 'Tipo' },
@@ -108,70 +137,20 @@ async function pintarCargos(el) {
     { clave: 'persona', titulo: 'Ocupante', render: (c) => (c.persona ? escapeHtml(nombreCompleto(c.persona)) : '<em>Vacante</em>') },
     { clave: 'activo', titulo: 'Activo', render: (c) => (c.activo ? 'Sí' : 'No') },
   ], cargos);
-  el.querySelector('[data-lista]').replaceChildren(tabla);
-}
+  const lista = el.querySelector('[data-lista]');
+  lista.replaceChildren(cobertura, tabla);
 
-// --- Cuentas ------------------------------------------------------------
-
-async function pintarCuentas(el) {
-  const personas = await fetchPersonasSinCuenta();
-  el.innerHTML = `
-    <p class="texto-mudo">Sin autoservicio de registro: las cuentas se crean aquí con correo y código de acceso.</p>
-    <form class="formulario" data-form-cuenta>
-      <label class="campo">
-        <span>Persona</span>
-        <select name="persona_id" required>${opcionesSelect(personas, { valor: 'id', etiqueta: nombreCompleto, vacio: 'Elige una persona sin cuenta' })}</select>
-      </label>
-      <label class="campo"><span>Correo de acceso</span><input name="correo" type="email" required /></label>
-      <label class="campo"><span>Código de acceso (mínimo 8 caracteres)</span><input name="codigo_acceso" type="text" minlength="8" required /></label>
-      <button type="submit" class="boton boton--primario boton--ancho">Crear cuenta</button>
-    </form>
-  `;
-  el.querySelector('[data-form-cuenta]').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const datos = datosFormulario(e.target);
-    const { data: { session } } = await supabase.auth.getSession();
-    const resp = await fetch(`${SUPABASE_URL}/functions/v1/crear-cuenta`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-        apikey: SUPABASE_ANON_KEY,
-      },
-      body: JSON.stringify(datos),
-    });
-    const resultado = await resp.json();
-    if (!resp.ok) {
-      mostrarAviso(resultado.error || 'No se pudo crear la cuenta.', 'error');
-      return;
-    }
-    mostrarAviso('Cuenta creada. Comparte el correo y el código de acceso por un canal seguro.', 'exito');
-    await pintarCuentas(el);
-  });
-}
-
-// --- Re-fechado -----------------------------------------------------------
-
-function pintarRefechado(el) {
-  el.innerHTML = `
-    <p class="texto-mudo">La fecha del evento (3–10 de noviembre de 2026) es tentativa. Esto mueve la fecha de cada actividad del rango y, con ella, la fecha límite de sus tareas.</p>
-    <form class="formulario" data-form-refechar>
-      <div class="formulario__fila">
-        <label class="campo"><span>Desde</span><input name="desde" type="date" required /></label>
-        <label class="campo"><span>Hasta</span><input name="hasta" type="date" required /></label>
-      </div>
-      <label class="campo"><span>Días a mover (negativo para adelantar)</span><input name="dias" type="number" required value="1" /></label>
-      <button type="submit" class="boton boton--primario boton--ancho">Re-fechar rango</button>
-    </form>
-  `;
-  el.querySelector('[data-form-refechar]').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const datos = datosFormulario(e.target);
-    const { data, error } = await supabase.rpc('fn_refechar_rango', {
-      p_desde: datos.desde, p_hasta: datos.hasta, p_dias: Number(datos.dias),
-    });
-    if (error) { mostrarAviso(mensajeError(error), 'error'); return; }
-    mostrarAviso(`Listo. ${data} actividades quedaron en el nuevo rango de fechas.`, 'exito');
+  tabla.querySelectorAll('tbody tr').forEach((tr, i) => {
+    const cargo = cargos[i];
+    if (!cargo || !cargo.persona) return;
+    const boton = document.createElement('button');
+    boton.type = 'button';
+    boton.className = 'boton boton--fantasma boton--pequeno';
+    boton.textContent = 'Sustituir';
+    boton.addEventListener('click', () => abrirModalSustitucion(cargo, personas, () => pintarCargos(el)));
+    const td = document.createElement('td');
+    td.appendChild(boton);
+    tr.appendChild(td);
   });
 }
 
@@ -180,8 +159,6 @@ function pintarRefechado(el) {
 const PESTANAS = {
   personas: { titulo: 'Personas', pintar: pintarPersonas },
   cargos: { titulo: 'Cargos', pintar: pintarCargos },
-  cuentas: { titulo: 'Cuentas', pintar: pintarCuentas },
-  refechado: { titulo: 'Re-fechado en bloque', pintar: pintarRefechado },
 };
 
 async function pintarPestana() {
@@ -193,12 +170,14 @@ async function pintarPestana() {
 export async function render(el) {
   contenedor = el;
   el.innerHTML = `
-    <div class="vista-cabecera"><h1>Administración</h1></div>
+    <div class="vista-cabecera"><h1>Personas y cargos</h1></div>
+    <div data-subnav-admin></div>
     <div class="filtros-chip" data-pestanas>
       ${Object.entries(PESTANAS).map(([clave, p]) => `<button type="button" class="chip${clave === pestanaActiva ? ' chip--activo' : ''}" data-pestana="${clave}">${p.titulo}</button>`).join('')}
     </div>
     <div data-cuerpo-admin></div>
   `;
+  pintarSubnavAdmin(el.querySelector('[data-subnav-admin]'), getEstado().sesion);
   el.querySelector('[data-pestanas]').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-pestana]');
     if (!btn) return;

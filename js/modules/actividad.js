@@ -1,6 +1,5 @@
 import { supabase } from '../core/supabase.js';
 import { getEstado } from '../core/store.js';
-import { navegar } from '../core/router.js';
 import { abrirModal } from '../ui/modal.js';
 import { icono } from '../ui/icono.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
@@ -107,7 +106,7 @@ function celdaAsignar(tarea, campo, cargos, alCambiar) {
 function filaTarea(tarea, cargos, alCambiar) {
   const tr = document.createElement('tr');
   const tdTitulo = document.createElement('td');
-  tdTitulo.innerHTML = `<a href="#/tarea/${tarea.id}">${escapeHtml(tarea.titulo)}</a>`;
+  tdTitulo.innerHTML = `<a href="/tarea.html?id=${tarea.id}">${escapeHtml(tarea.titulo)}</a>`;
   const tdEstado = document.createElement('td');
   tdEstado.innerHTML = `<span class="${'estado estado--' + tarea.estado.replace(/_/g, '-')}">${ESTADO_TAREA_LABEL[tarea.estado]}</span>`;
   const tdProgreso = document.createElement('td');
@@ -166,7 +165,7 @@ async function pintar() {
     <div class="tabla-envoltorio" data-tabla></div>
   `;
 
-  contenedor.querySelector('[data-volver]').addEventListener('click', () => navegar('#/calendario'));
+  contenedor.querySelector('[data-volver]').addEventListener('click', () => { location.href = '/calendario.html'; });
 
   const desplegarBtn = contenedor.querySelector('[data-desplegar]');
   if (desplegarBtn) {

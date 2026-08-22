@@ -1,6 +1,5 @@
 import { supabase } from '../core/supabase.js';
 import { getEstado } from '../core/store.js';
-import { navegar } from '../core/router.js';
 import { abrirModal } from '../ui/modal.js';
 import { icono } from '../ui/icono.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
@@ -73,7 +72,7 @@ function chipActividad(act) {
   div.type = 'button';
   div.className = `chip-actividad estado-${act.estado.replace(/_/g, '-')}`;
   div.innerHTML = `${marcador}<span class="chip-actividad__nombre">${escapeHtml(act.nombre)}</span>${act.dotacion_requerida ? `<span class="chip-actividad__conteo">${c.completadas}/${c.total || act.dotacion_requerida}</span>` : ''}`;
-  div.addEventListener('click', () => navegar(`#/actividad/${act.id}`));
+  div.addEventListener('click', () => { location.href = `/actividad.html?id=${act.id}`; });
   return div;
 }
 

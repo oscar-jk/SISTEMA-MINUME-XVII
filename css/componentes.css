@@ -95,9 +95,10 @@
 .estado--en-revision { background: var(--gold-100); color: var(--gold-600); }
 .estado--completada { background: #DBF0E6; color: var(--ok); }
 .estado--cancelada, .estado--no-aplica { background: #F1EFEA; color: var(--ink-3); }
-.estado--planificada { background: #ECEAE3; color: var(--ink-2); }
-.estado--confirmada { background: #DCEAFE; color: var(--navy-700); }
-.estado--realizada { background: #DBF0E6; color: var(--ok); }
+.estado--en-preparacion { background: #DCEAFE; color: var(--navy-700); }
+.estado--pendiente { background: var(--gold-100); color: var(--gold-600); }
+.estado--aprobada { background: #DBF0E6; color: var(--ok); }
+.estado--rechazada { background: #F6E2DE; color: var(--danger); }
 
 .prioridad {
   display: inline-flex;
@@ -357,3 +358,32 @@ input[type="range"].deslizador {
 }
 .ficha-datos span { display: block; font-size: var(--texto-xs); color: var(--ink-3); }
 .ficha-datos strong { font-family: var(--fuente-texto); font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------- evidencia */
+
+.evidencia-lista { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.75rem; }
+
+.evidencia-tarjeta {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radio);
+  padding: 1rem;
+}
+
+.evidencia-tarjeta__cima {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4em;
+  margin-bottom: 0.5em;
+}
+
+.evidencia-foto-enlace {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  font-size: var(--texto-xs);
+  font-weight: 600;
+  margin-bottom: 0.4em;
+}
