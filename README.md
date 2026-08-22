@@ -26,6 +26,21 @@ SIRIO mantiene su propio navy + dorado, ligado al nombre ("la estrella
 más brillante") y a "MINUME de Estrellas" — decisión explícita, no un
 descuido.
 
+El patrón de puntos genérico (login y header) se sustituyó por una
+constelación real dibujada a mano en SVG (`index.html`,
+`.pantalla-login__cielo`): 55 estrellas de fondo estáticas más 5 que
+forman a SIRIO y sus vecinas, con un parpadeo lento solo en esas cinco
+(`prefers-reduced-motion` lo desactiva). Se evaluaron librerías de
+campo de estrellas (tsParticles con su preset `stars`, varios scripts
+de starfield en canvas) pero se descartaron: cualquier dependencia
+runtime externa reintroduce el mismo riesgo que motivó vendorizar
+`supabase-js` (ver arriba) — el sistema debe seguir funcionando si un
+CDN cae el día del evento — y para un solo elemento decorativo estático
+no hay nada que una librería resuelva mejor que un SVG de ~60 líneas. El
+`app-header` perdió el patrón de puntos sin reemplazo: es una barra
+persistente durante horas de trabajo real, no el lugar para una
+decoración.
+
 Stack: HTML + CSS + JavaScript vanilla con módulos ES nativos. Sin
 framework, sin paso de build. Páginas HTML reales por módulo, no una SPA
 de una sola página — ver "Arquitectura" abajo. Supabase para datos,

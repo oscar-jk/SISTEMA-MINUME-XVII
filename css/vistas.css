@@ -11,8 +11,6 @@
   padding: 0 1.25rem;
   background: var(--navy-900);
   color: #fff;
-  background-image: radial-gradient(rgba(224, 188, 74, 0.35) 1px, transparent 1px);
-  background-size: 22px 22px;
 }
 
 .app-header__marca {
@@ -116,16 +114,46 @@
 /* ------------------------------------------------------------------- login */
 
 .pantalla-login {
+  position: relative;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
   background: var(--navy-900);
-  background-image: radial-gradient(rgba(224, 188, 74, 0.3) 1px, transparent 1px);
-  background-size: 26px 26px;
+  overflow: hidden;
 }
+
+/* Constelación de fondo: sustituye al patrón de puntos genérico por algo
+   con significado — SIRIO es la estrella más brillante del cielo nocturno.
+   Estático salvo un parpadeo lento en las estrellas principales (no un
+   campo de partículas animado — el sistema es institucional, no una
+   plantilla de producto). */
+.pantalla-login__cielo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+.pantalla-login__cielo .estrella-viva {
+  transform-origin: center;
+  animation: parpadeo-estrella 5s ease-in-out infinite;
+}
+.pantalla-login__cielo .estrella-viva:nth-child(2) { animation-delay: 0.6s; }
+.pantalla-login__cielo .estrella-viva:nth-child(3) { animation-delay: 1.7s; }
+.pantalla-login__cielo .estrella-viva:nth-child(4) { animation-delay: 2.4s; }
+@keyframes parpadeo-estrella {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pantalla-login__cielo .estrella-viva { animation: none; opacity: 0.85; }
+}
+
 .pantalla-login__tarjeta {
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 380px;
   background: var(--surface);
@@ -136,10 +164,11 @@
 .pantalla-login__marca {
   font-family: var(--fuente-titulo);
   font-size: 1.6rem;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--navy-900);
   margin: 0;
   text-align: center;
+  letter-spacing: -0.01em;
 }
 .pantalla-login__marca span { color: var(--gold-600); }
 .pantalla-login__subtitulo {
