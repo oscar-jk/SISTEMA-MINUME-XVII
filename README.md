@@ -254,9 +254,12 @@ revisión, aprobar/devolver) ya construidas en `tareas.js`/`bandeja.js`
 `sistema-de-check-in-minume-xvii.vercel.app`, un prototipo de
 acreditación/checklist para MINUME XVII que hoy no tiene backend real
 (todo en `localStorage`, sin Supabase) — sus otras piezas (acreditación
-con QR, datos de salud/hospedaje, croquis con estado de salón en vivo,
-directorio de staff) quedan para rondas futuras, cada una con su propio
-diagnóstico antes de construirse.
+con QR, datos de salud/hospedaje, croquis con estado de salón en vivo)
+quedan para rondas futuras, cada una con su propio diagnóstico antes de
+construirse. El directorio de staff sí se sumó: pestaña "Directorio" en
+`organigrama.html`, misma consulta que el árbol, buscable por nombre,
+cargo, correo, subsecretaría o comisión, con correo/teléfono como
+enlaces `mailto:`/`tel:`.
 
 ## Fuera de alcance de esta ronda
 

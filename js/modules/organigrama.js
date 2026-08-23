@@ -1,20 +1,24 @@
-// Árbol recursivo sin límite de profundidad, navegable por división. Lo
-// que se ve aquí ya viene filtrado por RLS: cada quien ve su propia rama
-// hacia abajo, nunca el organigrama completo salvo que tenga alcance para
-// ello (super admin, o SG para las tres divisiones).
+// Árbol recursivo sin límite de profundidad, navegable por división, más
+// un directorio plano y buscable con datos de contacto — misma consulta,
+// dos lentes. Lo que se ve aquí ya viene filtrado por RLS: cada quien ve
+// su propia rama hacia abajo, nunca el organigrama completo salvo que
+// tenga alcance para ello (super admin, o SG para las tres divisiones).
 import { supabase } from '../core/supabase.js';
 import { icono } from '../ui/icono.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 import { nombreCompleto, escapeHtml, iniciales } from '../utils/formato.js';
+import { crearTabla } from '../ui/tabla.js';
 
 let contenedor = null;
 let cargos = [];
 let divisionActiva = '';
+let pestanaActiva = 'arbol';
+let busqueda = '';
 
 async function cargar() {
   const { data, error } = await supabase
     .from('cargos')
-    .select('id, nombre, tipo, division, superior_id, activo, persona:personas(nombre, apellido)')
+    .select('id, nombre, tipo, division, subsecretaria, comision, superior_id, activo, persona:personas(nombre, apellido, correo, telefono)')
     .eq('activo', true)
     .order('nombre');
   if (error) {
@@ -75,36 +79,108 @@ function nodoHtml(cargo, profundidad) {
   return div;
 }
 
-function pintar() {
+function pintarArbol(el) {
   const lista = divisionActiva ? cargos.filter((c) => c.division === divisionActiva || !c.division) : cargos;
   const raices = construirArbol(lista);
-  const cuerpo = contenedor.querySelector('[data-arbol]');
-  cuerpo.innerHTML = '';
+  el.innerHTML = '';
   if (raices.length === 0) {
-    cuerpo.innerHTML = '<p class="estado-vacio">No hay cargos visibles en esta división.</p>';
+    el.innerHTML = '<p class="estado-vacio">No hay cargos visibles en esta división.</p>';
     return;
   }
-  for (const raiz of raices) cuerpo.appendChild(nodoHtml(raiz, 0));
+  for (const raiz of raices) el.appendChild(nodoHtml(raiz, 0));
+}
+
+function coincideBusqueda(cargo, texto) {
+  if (!texto) return true;
+  const q = texto.toLowerCase();
+  return nombreCompleto(cargo.persona).toLowerCase().includes(q)
+    || cargo.nombre.toLowerCase().includes(q)
+    || (cargo.persona?.correo || '').toLowerCase().includes(q)
+    || (cargo.subsecretaria || '').toLowerCase().includes(q)
+    || (cargo.comision || '').toLowerCase().includes(q);
+}
+
+function pintarDirectorio(el) {
+  const lista = cargos
+    .filter((c) => (!divisionActiva || c.division === divisionActiva || !c.division))
+    .filter((c) => coincideBusqueda(c, busqueda));
+
+  if (lista.length === 0) {
+    el.innerHTML = '<p class="estado-vacio">No hay cargos con estos filtros.</p>';
+    return;
+  }
+
+  const tabla = crearTabla([
+    { clave: 'persona', titulo: 'Nombre', render: (c) => nombreCompleto(c.persona) },
+    { clave: 'nombre', titulo: 'Cargo' },
+    {
+      clave: 'rama',
+      titulo: 'División / rama',
+      render: (c) => [c.division ? c.division.toUpperCase() : null, c.subsecretaria, c.comision].filter(Boolean).join(' · ') || '—',
+    },
+    {
+      clave: 'correo',
+      titulo: 'Correo',
+      html: true,
+      render: (c) => (c.persona?.correo ? `<a href="mailto:${escapeHtml(c.persona.correo)}">${escapeHtml(c.persona.correo)}</a>` : '—'),
+    },
+    {
+      clave: 'telefono',
+      titulo: 'Teléfono',
+      html: true,
+      render: (c) => (c.persona?.telefono ? `<a href="tel:${escapeHtml(c.persona.telefono)}">${escapeHtml(c.persona.telefono)}</a>` : '—'),
+    },
+  ], lista);
+
+  el.innerHTML = '';
+  el.appendChild(tabla);
+}
+
+function pintar() {
+  const cuerpo = contenedor.querySelector('[data-cuerpo]');
+  if (pestanaActiva === 'arbol') pintarArbol(cuerpo);
+  else pintarDirectorio(cuerpo);
 }
 
 export async function render(el) {
   contenedor = el;
   el.innerHTML = `
     <div class="vista-cabecera"><h1>Organigrama</h1></div>
+    <div class="filtros-chip" data-pestanas>
+      <button type="button" class="chip chip--activo" data-pestana="arbol">Árbol</button>
+      <button type="button" class="chip" data-pestana="directorio">Directorio</button>
+    </div>
     <div class="filtros-chip" data-divisiones>
       <button type="button" class="chip chip--activo" data-division="">Todas</button>
       <button type="button" class="chip" data-division="sg">SG</button>
       <button type="button" class="chip" data-division="sga">SGA</button>
       <button type="button" class="chip" data-division="sgl">SGL</button>
     </div>
-    <div data-arbol><p class="estado-vacio">Cargando…</p></div>
+    <div data-buscar-envoltorio hidden>
+      <input type="search" placeholder="Buscar por nombre, cargo, correo, subsecretaría o comisión…" data-buscar class="campo-buscar" />
+    </div>
+    <div data-cuerpo><p class="estado-vacio">Cargando…</p></div>
   `;
+
+  el.querySelector('[data-pestanas]').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-pestana]');
+    if (!btn) return;
+    pestanaActiva = btn.dataset.pestana;
+    el.querySelectorAll('[data-pestana]').forEach((b) => b.classList.toggle('chip--activo', b === btn));
+    el.querySelector('[data-buscar-envoltorio]').hidden = pestanaActiva !== 'directorio';
+    pintar();
+  });
 
   el.querySelector('[data-divisiones]').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-division]');
     if (!btn) return;
     divisionActiva = btn.dataset.division;
     el.querySelectorAll('[data-division]').forEach((b) => b.classList.toggle('chip--activo', b === btn));
+    pintar();
+  });
+
+  el.querySelector('[data-buscar]').addEventListener('input', (e) => {
+    busqueda = e.target.value.trim();
     pintar();
   });
 
