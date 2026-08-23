@@ -24,6 +24,7 @@ const ENLACES_NAV = [
   { href: '/organigrama.html', texto: 'Organigrama', iconoNombre: 'organigrama' },
   { href: '/espacios.html', texto: 'Espacios', iconoNombre: 'edificio' },
   { href: '/asistencia.html', texto: 'Asistencia', iconoNombre: 'reloj' },
+  { href: '/verificar.html', texto: 'Verificar', iconoNombre: 'escanear' },
   { href: '/admin-personas.html', texto: 'Admin', iconoNombre: 'admin', requiere: 'asignar' },
 ];
 
@@ -35,6 +36,7 @@ export const ENLACES_ADMIN = [
   { href: '/admin-cuentas.html', texto: 'Cuentas', requiere: 'admin' },
   { href: '/admin-catalogos.html', texto: 'Catálogos', requiere: 'admin' },
   { href: '/admin-configuracion.html', texto: 'Configuración', requiere: 'admin' },
+  { href: '/admin-acreditacion.html', texto: 'Acreditación', requiere: 'asignar' },
   { href: '/bitacora.html', texto: 'Bitácora', requiere: 'admin' },
 ];
 

@@ -32,6 +32,16 @@ async function fetchCargos() {
   return data || [];
 }
 
+async function alternarAccesoSalud(cargo, alTerminar) {
+  const { error } = await supabase
+    .from('cargos')
+    .update({ acceso_salud_acreditacion: !cargo.acceso_salud_acreditacion })
+    .eq('id', cargo.id);
+  if (error) { mostrarAviso(mensajeError(error), 'error'); return; }
+  mostrarAviso(cargo.acceso_salud_acreditacion ? 'Acceso a salud retirado.' : 'Acceso a salud otorgado.', 'exito');
+  alTerminar();
+}
+
 // --- Personas -------------------------------------------------------------
 
 // Crear persona y asignarle cargo son, en RLS, dos escrituras separadas
@@ -203,20 +213,36 @@ async function pintarCargos(el) {
     { clave: 'division', titulo: 'División', render: (c) => (c.division || '—').toUpperCase() },
     { clave: 'persona', titulo: 'Ocupante', html: true, render: (c) => (c.persona ? escapeHtml(nombreCompleto(c.persona)) : '<em>Vacante</em>') },
     { clave: 'activo', titulo: 'Activo', render: (c) => (c.activo ? 'Sí' : 'No') },
+    { clave: 'acceso_salud_acreditacion', titulo: 'Acceso a salud', render: (c) => (c.acceso_salud_acreditacion ? 'Sí' : 'No') },
   ], cargos);
   const lista = el.querySelector('[data-lista]');
   lista.replaceChildren(cobertura, tabla);
 
+  const { sesion } = getEstado();
   tabla.querySelectorAll('tbody tr').forEach((tr, i) => {
     const cargo = cargos[i];
-    if (!cargo || !cargo.persona) return;
-    const boton = document.createElement('button');
-    boton.type = 'button';
-    boton.className = 'boton boton--fantasma boton--pequeno';
-    boton.textContent = 'Sustituir';
-    boton.addEventListener('click', () => abrirModalSustitucion(cargo, personas, () => pintarCargos(el)));
+    if (!cargo) return;
     const td = document.createElement('td');
-    td.appendChild(boton);
+    td.className = 'tabla__acciones';
+
+    if (cargo.persona) {
+      const sustituirBtn = document.createElement('button');
+      sustituirBtn.type = 'button';
+      sustituirBtn.className = 'boton boton--fantasma boton--pequeno';
+      sustituirBtn.textContent = 'Sustituir';
+      sustituirBtn.addEventListener('click', () => abrirModalSustitucion(cargo, personas, () => pintarCargos(el)));
+      td.appendChild(sustituirBtn);
+    }
+
+    if (sesion.esSuperAdmin) {
+      const saludBtn = document.createElement('button');
+      saludBtn.type = 'button';
+      saludBtn.className = 'boton boton--fantasma boton--pequeno';
+      saludBtn.textContent = cargo.acceso_salud_acreditacion ? 'Quitar acceso a salud' : 'Dar acceso a salud';
+      saludBtn.addEventListener('click', () => alternarAccesoSalud(cargo, () => pintarCargos(el)));
+      td.appendChild(saludBtn);
+    }
+
     tr.appendChild(td);
   });
 }

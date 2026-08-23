@@ -55,10 +55,12 @@ conexión, compuerta de sesión) para que ninguna página lo duplique a
 mano; cada página solo declara los placeholders vacíos y llama a
 `montarShell()`. `js/core/parametros.js` reemplaza los parámetros de ruta
 del viejo router: las páginas de detalle usan query string
-(`tarea.html?id=...`). Con 15 páginas, el header/nav móvil solo muestra
+(`tarea.html?id=...`). Con 19 páginas, el header/nav móvil solo muestra
 los destinos principales — todo lo de administración cuelga de un único
 enlace "Admin" y su propia sub-navegación en cada página `admin-*.html`
-(`pintarSubnavAdmin()` en `shell.js`).
+(`pintarSubnavAdmin()` en `shell.js`). `registro.html` es la única
+excepción a "toda página exige sesión" — ver "Acreditación de
+delegados" más abajo.
 
 ## Estructura
 
@@ -164,10 +166,22 @@ frontend — `js/core/permisos.js` solo oculta botones. El detalle está en
   las tablas base, igual que `v_tareas`/`v_horas_servicio`.
 - `0025` — corrige `search_path` mutable en los helpers de fecha/hora
   locales añadidos en `0019`.
+- `0027` — catálogo `regionales` (18 filas), y `cargos.acceso_salud_acreditacion`
+  sumado a la misma protección de `fn_validar_cambio_cargo()` que ya
+  blindaba `tipo`/`superior_id`/`evaluador_id`.
+- `0028` — `acreditados`/`acreditados_salud` (tabla de salud aparte, RLS
+  mucho más estrecha), bucket de Storage `acreditacion`, tabla
+  `acreditacion_intentos` para el límite de tasa — ver "Acreditación de
+  delegados" abajo.
+- `0029` — `regionales` con lectura pública (`anon`): el formulario de
+  registro la necesita antes de iniciar sesión, que no tiene.
 
 Las únicas piezas que tocan la clave de servicio de Supabase son las
 Edge Functions (`crear-cuenta`, `restablecer-contrasena`,
-`alternar-cuenta`, `purgar-evidencia`): nunca viajan al navegador.
+`alternar-cuenta`, `purgar-evidencia`, `registrar-acreditado`): nunca
+viajan al navegador. `registrar-acreditado` es la única con
+`verify_jwt: false` — su propia lógica de límite de tasa hace las veces
+de protección, ver "Acreditación de delegados".
 
 Además, `js/ui/tabla.js` escapa por defecto toda celda (dato crudo o lo
 que devuelva `render()`); una columna solo se libra con `html: true`
@@ -253,10 +267,7 @@ revisión, aprobar/devolver) ya construidas en `tareas.js`/`bandeja.js`
 — exportadas de ahí, no duplicadas. Nace de comparar SIRIO contra
 `sistema-de-check-in-minume-xvii.vercel.app`, un prototipo de
 acreditación/checklist para MINUME XVII que hoy no tiene backend real
-(todo en `localStorage`, sin Supabase) — sus otras piezas (acreditación
-con QR, datos de salud/hospedaje, croquis con estado de salón en vivo)
-quedan para rondas futuras, cada una con su propio diagnóstico antes de
-construirse. El directorio de staff sí se sumó: pestaña "Directorio" en
+(todo en `localStorage`, sin Supabase). El directorio de staff sí se sumó: pestaña "Directorio" en
 `organigrama.html`, misma consulta que el árbol, buscable por nombre,
 cargo, correo, subsecretaría o comisión, con correo/teléfono como
 enlaces `mailto:`/`tel:`. El croquis en vivo también se sumó: pestaña
@@ -269,16 +280,64 @@ explícita: refresco por sondeo, no Realtime — evita el presupuesto de
 conexiones/mensajes que Realtime exige calcular por escrito antes de
 implementarse (Bloque D, aún pendiente).
 
+## Acreditación de delegados (SIRIO-ACR)
+
+`registro.html` es la única página pública de todo el sistema — sin
+`montarShell()`, sin sesión. Cualquiera con el enlace puede registrarse
+como delegado, mesa directiva, prensa, staff, etc. (9 roles, distintos de
+`tipo_cargo`: un delegado no tiene cargo en la jerarquía de MINUME).
+
+**Arquitectura, con las decisiones tal como se confirmaron:**
+- **Escritura**: la Edge Function pública `registrar-acreditado`
+  (`verify_jwt: false`, la única del sistema sin JWT) hace todo el
+  trabajo con `service_role` — nunca hay política de INSERT para `anon`
+  ni `authenticated` en `acreditados`/`acreditados_salud`/Storage. Límite
+  de tasa propio: máximo 5 envíos por IP cada 10 minutos, contra una
+  tabla `acreditacion_intentos` con RLS activa y cero políticas (ni el
+  propio cliente autenticado puede leerla).
+- **Salud aparte**: `acreditados_salud` (diagnóstico, alergias, contacto
+  de emergencia) es una tabla separada de `acreditados` con su propia
+  RLS — solo super admin o un cargo con `acceso_salud_acreditacion = true`
+  (columna nueva en `cargos`, protegida por el mismo trigger que ya
+  blindaba `tipo`/`superior_id`/`evaluador_id` desde A1; se otorga desde
+  *Admin → Personas y cargos*, pestaña Cargos). El certificado médico en
+  Storage tiene la misma restricción — es en sí mismo un documento de
+  salud.
+- **QR**: codifica una URL (`verificar.html?c=<código>`), no datos
+  personales — el propio teléfono del staff la escanea con su cámara
+  nativa, sin necesitar un lector propio dentro de SIRIO. El código es
+  aleatorio de 10 caracteres, alfabeto sin ambigüedad visual (`ABCDEFGHJKMNPQRSTUVWXYZ23456789`,
+  sin 0/O/1/I/L). Generado con
+  [`qrcode-generator`](https://github.com/kazuhikoarase/qrcode-generator)
+  vendorizado en `js/vendor/` (mismo criterio que `supabase-js`: se
+  evaluó tsParticles y otras opciones con CDN, se descartaron por la
+  misma razón).
+- **Verificación en la puerta**: `verificar.html` (con sesión) — busca
+  por código, muestra nombre/foto/estado, nunca datos de salud.
+  Accesible a cualquier staff autenticado, no solo a quien asigna: el
+  RLS de `acreditados` es de lectura abierta a `authenticated`.
+- **Retención**: sin purga automática — son documentos de respaldo de
+  una acreditación oficial, no evidencia operativa de una tarea.
+- **Regionales**: catálogo nuevo (`regionales`, 18 filas R1–R18) con
+  técnico regional y receptor de invitados por regional — administrable
+  en *Admin → Catálogos → Regionales*, lectura pública (el formulario de
+  registro los necesita sin sesión).
+- **Revisión**: `admin-acreditacion.html` — aprobar/rechazar es
+  `puede_asignar()`, igual que el resto del sistema.
+
 ## Fuera de alcance de esta ronda
 
 Del catálogo maestro de 172 funcionalidades: evaluación por cortes
 (rúbricas/pesos — las tablas base ya existen sin usar, ver
 `criterios_evaluacion`/`evaluaciones`/`es_evaluador_de()`), comisiones
 como estructura propia, consolidados en tiempo real, reportes y
-exportación, croquis público, planificación estratégica, hospedaje y
-regionales, auditoría completa (esta ronda solo tiene la bitácora
-mínima), y acreditación de delegados. También quedan pendientes de una
-ronda dedicada: paginación general de listas largas, densificación de
+exportación, croquis público (vista de solo lectura del plano sin
+sesión — el croquis en vivo actual sí exige login), planificación
+estratégica, hospedaje detallado más allá de lo que ya captura
+acreditación (número de habitación/compañero/líder de edificio), y
+auditoría completa (esta ronda solo tiene la bitácora mínima). También
+quedan pendientes de una ronda dedicada: paginación general de listas
+largas, densificación de
 `mis-tareas`/`bandeja` a tablas con filtros persistentes en la URL,
 Realtime, PWA, notificaciones internas, y una auditoría de accesibilidad
 completa (foco de modal, ARIA, `prefers-reduced-motion`).

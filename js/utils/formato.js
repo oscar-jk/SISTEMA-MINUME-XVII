@@ -23,6 +23,24 @@ export const PRIORIDAD_LABEL = {
   critica: 'Crítica',
 };
 
+export const ROL_ACREDITACION_LABEL = {
+  delegado_nacional: 'Delegado nacional',
+  mesa_directiva: 'Mesa directiva',
+  tecnico_docente: 'Técnico o docente',
+  secretaria_general: 'Secretaría general',
+  subsecretaria: 'Subsecretaría',
+  staff: 'Staff',
+  equipo_logistico: 'Equipo logístico',
+  prensa_clit: 'Prensa CLIT',
+  invitado_especial: 'Invitado especial',
+};
+
+export const ESTADO_ACREDITADO_LABEL = {
+  pendiente: 'Pendiente',
+  aprobado: 'Aprobado',
+  rechazado: 'Rechazado',
+};
+
 export function claseEstadoTarea(estado) {
   return `estado estado--${estado.replace(/_/g, '-')}`;
 }

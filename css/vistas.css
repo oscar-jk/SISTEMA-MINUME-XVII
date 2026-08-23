@@ -457,3 +457,82 @@
 .checklist-grupo__cabecera .subtitulo { margin: 0; }
 .checklist__marca { width: 2rem; text-align: center; }
 .checklist__check { color: var(--ok); }
+
+/* -------------------------------------------------------------- registro */
+
+.pantalla-registro {
+  min-height: 100vh;
+  background: var(--paper);
+}
+.pantalla-registro__cabecera {
+  background: var(--navy-900);
+  color: #fff;
+  padding: 1.5rem 1.25rem;
+  text-align: center;
+}
+.pantalla-registro__marca {
+  font-family: var(--fuente-titulo);
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin: 0;
+}
+.pantalla-registro__marca span { color: var(--gold-300); }
+.pantalla-registro__subtitulo {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: var(--texto-sm);
+  margin: 0.3em 0 0;
+}
+.pantalla-registro__contenido {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 3rem;
+}
+
+.registro-formulario { display: flex; flex-direction: column; gap: 0.9rem; }
+.registro-seccion {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radio);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.registro-exito { text-align: center; }
+.registro-qr { display: flex; justify-content: center; margin: 1.5rem 0; }
+.registro-qr svg { width: 220px; height: 220px; }
+.registro-codigo {
+  font-family: var(--fuente-titulo);
+  font-size: var(--texto-lg);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--navy-900);
+}
+
+/* ------------------------------------------------------------- verificar */
+
+.verificar-tarjeta {
+  max-width: 360px;
+  margin: 0 auto;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radio);
+  padding: 1.5rem;
+}
+.verificar-foto {
+  width: 140px;
+  height: 140px;
+  object-fit: cover;
+  border-radius: var(--radio-chico);
+  margin: 0 auto;
+}
+.verificar-foto--vacia {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--paper);
+  color: var(--ink-3);
+  font-size: var(--texto-xs);
+}

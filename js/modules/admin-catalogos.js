@@ -7,6 +7,8 @@ import { icono } from '../ui/icono.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 import { datosFormulario, opcionesSelect } from '../ui/formulario.js';
 import { crearTabla } from '../ui/tabla.js';
+import { abrirModal } from '../ui/modal.js';
+import { escapeHtml } from '../utils/formato.js';
 
 let contenedor = null;
 let pestanaActiva = 'propiedades';
@@ -132,11 +134,67 @@ async function pintarFases(el) {
   ], filas));
 }
 
+function abrirModalRegional(regional, alGuardar) {
+  const div = document.createElement('div');
+  div.innerHTML = `
+    <form class="formulario" data-form>
+      <div class="formulario__fila">
+        <label class="campo"><span>Técnico regional</span><input name="tecnico_nombre" value="${escapeHtml(regional.tecnico_nombre || '')}" /></label>
+        <label class="campo"><span>Teléfono del técnico</span><input name="tecnico_telefono" value="${escapeHtml(regional.tecnico_telefono || '')}" /></label>
+      </div>
+      <div class="formulario__fila">
+        <label class="campo"><span>Receptor de invitados</span><input name="receptor_nombre" value="${escapeHtml(regional.receptor_nombre || '')}" /></label>
+        <label class="campo"><span>Teléfono del receptor</span><input name="receptor_telefono" value="${escapeHtml(regional.receptor_telefono || '')}" /></label>
+      </div>
+      <button type="submit" class="boton boton--primario boton--ancho">Guardar</button>
+    </form>
+  `;
+  const { cerrar } = abrirModal({ titulo: `Regional ${regional.codigo}`, contenido: div, ancho: 'normal' });
+  div.querySelector('[data-form]').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const { error } = await supabase.from('regionales').update(datosFormulario(e.target)).eq('id', regional.id);
+    if (error) { mostrarAviso(mensajeError(error), 'error'); return; }
+    mostrarAviso('Regional actualizada.', 'exito');
+    cerrar();
+    alGuardar();
+  });
+}
+
+async function pintarRegionales(el) {
+  const filas = (await fetchTabla('regionales', 'codigo'))
+    .sort((a, b) => (parseInt(a.codigo.slice(1), 10) || 0) - (parseInt(b.codigo.slice(1), 10) || 0));
+  el.innerHTML = '<div data-lista></div>';
+
+  const tabla = crearTabla([
+    { clave: 'codigo', titulo: 'Regional' },
+    { clave: 'tecnico_nombre', titulo: 'Técnico regional', render: (f) => f.tecnico_nombre || '—' },
+    { clave: 'tecnico_telefono', titulo: 'Teléfono', render: (f) => f.tecnico_telefono || '—' },
+    { clave: 'receptor_nombre', titulo: 'Receptor de invitados', render: (f) => f.receptor_nombre || '—' },
+    { clave: 'receptor_telefono', titulo: 'Teléfono', render: (f) => f.receptor_telefono || '—' },
+  ], filas);
+
+  tabla.querySelectorAll('tbody tr').forEach((tr, i) => {
+    const regional = filas[i];
+    if (!regional) return;
+    const td = document.createElement('td');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'boton boton--fantasma boton--pequeno';
+    btn.textContent = 'Editar';
+    btn.addEventListener('click', () => abrirModalRegional(regional, () => pintarRegionales(el)));
+    td.appendChild(btn);
+    tr.appendChild(td);
+  });
+
+  el.querySelector('[data-lista]').replaceChildren(tabla);
+}
+
 const PESTANAS = {
   propiedades: { titulo: 'Propiedades', pintar: pintarPropiedades },
   espacios: { titulo: 'Espacios', pintar: pintarEspacios },
   subsecretarias: { titulo: 'Subsecretarías', pintar: pintarSubsecretarias },
   fases: { titulo: 'Fases', pintar: pintarFases },
+  regionales: { titulo: 'Regionales', pintar: pintarRegionales },
 };
 
 async function pintarPestana() {

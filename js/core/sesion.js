@@ -19,7 +19,7 @@ async function cargarPerfil(userId) {
   const [{ data: cargos, error: ec }, { data: idActivo, error: eActivo }] = await Promise.all([
     supabase
       .from('cargos')
-      .select('id, nombre, tipo, division, subsecretaria, comision, superior_id')
+      .select('id, nombre, tipo, division, subsecretaria, comision, superior_id, acceso_salud_acreditacion')
       .eq('persona_id', usuario.persona_id)
       .eq('activo', true)
       .order('creado_en'),
