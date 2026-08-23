@@ -259,7 +259,15 @@ quedan para rondas futuras, cada una con su propio diagnóstico antes de
 construirse. El directorio de staff sí se sumó: pestaña "Directorio" en
 `organigrama.html`, misma consulta que el árbol, buscable por nombre,
 cargo, correo, subsecretaría o comisión, con correo/teléfono como
-enlaces `mailto:`/`tel:`.
+enlaces `mailto:`/`tel:`. El croquis en vivo también se sumó: pestaña
+"En vivo" en `espacios.html`, calcula el estado de cada salón (en
+sesión / próxima sesión / sesiones terminadas / libre) al vuelo contra
+`actividades.hora_inicio/hora_fin` de hoy, sin campo de estado propio
+que mantener sincronizado — se refresca solo cada 30s (`setInterval`,
+limpiado al cambiar de pestaña o salir de la página). Decisión
+explícita: refresco por sondeo, no Realtime — evita el presupuesto de
+conexiones/mensajes que Realtime exige calcular por escrito antes de
+implementarse (Bloque D, aún pendiente).
 
 ## Fuera de alcance de esta ronda
 

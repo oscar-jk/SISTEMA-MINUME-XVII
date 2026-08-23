@@ -14,6 +14,7 @@ import { puedeAsignar } from '../core/permisos.js';
 let contenedor = null;
 let pestanaActiva = 'plano';
 let pisoActivo = '';
+let intervaloEnVivo = null;
 
 async function fetchEspacios() {
   const { data, error } = await supabase
@@ -44,6 +45,82 @@ async function fetchAsignaciones(fecha) {
   const { data, error } = await query.limit(100);
   if (error) { mostrarAviso(mensajeError(error), 'error'); return []; }
   return data;
+}
+
+// "En vivo" no guarda un estado propio del espacio: lo calcula al vuelo
+// contra las actividades de hoy que apuntan a ese espacio_id, comparando
+// la hora local del navegador (no una franja server-side — es solo para
+// mostrar "ahora mismo", se refresca solo cada 30s con la fecha/hora que
+// venga de la propia consulta a actividades.hora_inicio/hora_fin).
+async function fetchActividadesHoy() {
+  const { data, error } = await supabase
+    .from('actividades')
+    .select('id, codigo, nombre, espacio_id, hora_inicio, hora_fin, estado')
+    .eq('fecha', hoyISO())
+    .not('espacio_id', 'is', null)
+    .neq('estado', 'cancelada');
+  if (error) { mostrarAviso(mensajeError(error), 'error'); return []; }
+  return data;
+}
+
+function horaActualLocal() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:00`;
+}
+
+function calcularEstadoEnVivo(espacio, actividadesHoy, ahora) {
+  const propias = actividadesHoy.filter((a) => a.espacio_id === espacio.id && a.hora_inicio && a.hora_fin);
+
+  const enCurso = propias.find((a) => a.hora_inicio <= ahora && ahora <= a.hora_fin);
+  if (enCurso) {
+    return { estado: 'en-sesion', etiqueta: 'En sesión', detalle: `${enCurso.codigo} · ${enCurso.nombre} · hasta ${enCurso.hora_fin.slice(0, 5)}` };
+  }
+
+  const proxima = [...propias].filter((a) => a.hora_inicio > ahora).sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio))[0];
+  if (proxima) {
+    return { estado: 'proximo', etiqueta: 'Próxima sesión', detalle: `${proxima.hora_inicio.slice(0, 5)} · ${proxima.codigo} · ${proxima.nombre}` };
+  }
+
+  if (propias.some((a) => a.hora_fin < ahora)) {
+    return { estado: 'cerrado', etiqueta: 'Sesiones terminadas', detalle: 'No hay más actividad programada aquí hoy.' };
+  }
+
+  return { estado: 'libre', etiqueta: 'Libre', detalle: 'Sin actividad programada aquí hoy.' };
+}
+
+async function pintarEnVivo(el, espacios) {
+  el.innerHTML = `
+    <p class="texto-mudo texto-pequeno" data-actualizado></p>
+    <div data-tabla-envivo></div>
+  `;
+
+  async function actualizar() {
+    const [actividadesHoy] = await Promise.all([fetchActividadesHoy()]);
+    const ahora = horaActualLocal();
+    const vivos = espacios.map((e) => ({ ...e, vivo: calcularEstadoEnVivo(e, actividadesHoy, ahora) }));
+
+    const tabla = crearTabla([
+      { clave: 'nombre', titulo: 'Espacio' },
+      { clave: 'piso', titulo: 'Piso' },
+      { clave: 'capacidad', titulo: 'Capacidad' },
+      {
+        clave: 'estado',
+        titulo: 'Estado ahora',
+        html: true,
+        render: (e) => `<span class="estado estado--${e.vivo.estado}">${escapeHtml(e.vivo.etiqueta)}</span>`,
+      },
+      { clave: 'detalle', titulo: 'Detalle', render: (e) => e.vivo.detalle },
+    ], vivos);
+
+    const contTabla = el.querySelector('[data-tabla-envivo]');
+    if (contTabla) contTabla.replaceChildren(tabla);
+    const marcaTiempo = el.querySelector('[data-actualizado]');
+    if (marcaTiempo) marcaTiempo.textContent = `Actualizado ${new Date().toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' })} · se refresca solo cada 30s`;
+  }
+
+  await actualizar();
+  if (intervaloEnVivo) clearInterval(intervaloEnVivo);
+  intervaloEnVivo = setInterval(actualizar, 30000);
 }
 
 async function pintarPlano(el, espacios) {
@@ -152,10 +229,15 @@ async function pintarAsignaciones(el, espacios) {
 }
 
 async function pintarPestana() {
+  if (pestanaActiva !== 'envivo' && intervaloEnVivo) {
+    clearInterval(intervaloEnVivo);
+    intervaloEnVivo = null;
+  }
   const cuerpo = contenedor.querySelector('[data-cuerpo]');
   cuerpo.innerHTML = '<p class="estado-vacio">Cargando…</p>';
   const espacios = await fetchEspacios();
   if (pestanaActiva === 'plano') await pintarPlano(cuerpo, espacios);
+  else if (pestanaActiva === 'envivo') await pintarEnVivo(cuerpo, espacios);
   else await pintarAsignaciones(cuerpo, espacios);
 }
 
@@ -165,6 +247,7 @@ export async function render(el) {
     <div class="vista-cabecera"><h1>Espacios</h1></div>
     <div class="filtros-chip" data-pestanas>
       <button type="button" class="chip chip--activo" data-pestana="plano">Plano</button>
+      <button type="button" class="chip" data-pestana="envivo">En vivo</button>
       <button type="button" class="chip" data-pestana="asignaciones">Asignaciones</button>
     </div>
     <div data-cuerpo></div>
@@ -180,5 +263,7 @@ export async function render(el) {
 }
 
 export function destroy() {
+  if (intervaloEnVivo) clearInterval(intervaloEnVivo);
+  intervaloEnVivo = null;
   contenedor = null;
 }

@@ -99,6 +99,10 @@
 .estado--pendiente { background: var(--gold-100); color: var(--gold-600); }
 .estado--aprobada { background: #DBF0E6; color: var(--ok); }
 .estado--rechazada { background: #F6E2DE; color: var(--danger); }
+.estado--en-sesion { background: #DBF0E6; color: var(--ok); }
+.estado--proximo { background: var(--gold-100); color: var(--gold-600); }
+.estado--libre { background: #ECEAE3; color: var(--ink-2); }
+.estado--cerrado { background: #F1EFEA; color: var(--ink-3); }
 
 .prioridad {
   display: inline-flex;
