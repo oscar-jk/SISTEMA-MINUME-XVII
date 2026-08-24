@@ -19,7 +19,7 @@ let busqueda = '';
 async function cargar() {
   const { data, error } = await supabase
     .from('cargos')
-    .select('id, nombre, tipo, division, subsecretaria:subsecretarias(nombre), comision:comisiones(nombre), superior_id, activo, persona:personas(nombre, apellido, correo, telefono)')
+    .select('id, nombre, tipo, division, subsecretaria:subsecretarias(nombre), comision:comisiones(nombre), superior_id, activo, persona:personas!cargos_persona_id_fkey(nombre, apellido, correo, telefono)')
     .eq('activo', true)
     .order('nombre');
   if (error) {

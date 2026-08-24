@@ -165,7 +165,7 @@ async function aprobar(fila, alTerminar) {
 async function pintarAprobacion(el) {
   const { data, error } = await supabase
     .from('asistencia')
-    .select('*, cargo:cargos!asistencia_cargo_id_fkey(nombre, persona:personas(nombre, apellido)), grupo_trabajo:grupos_trabajo(nombre, espacio:espacios(nombre))')
+    .select('*, cargo:cargos!asistencia_cargo_id_fkey(nombre, persona:personas!cargos_persona_id_fkey(nombre, apellido)), grupo_trabajo:grupos_trabajo(nombre, espacio:espacios(nombre))')
     .in('estado', ['pendiente', 'aprobado'])
     .order('fecha', { ascending: false })
     .limit(50);

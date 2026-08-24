@@ -108,6 +108,8 @@
 .estado--proximo { border-left-color: var(--gold-500); color: var(--gold-600); }
 .estado--libre { border-left-color: var(--ink-3); color: var(--ink-2); }
 .estado--cerrado { border-left-color: var(--ink-3); color: var(--ink-3); }
+.estado--atendida { border-left-color: var(--ok); color: var(--ok); }
+.estado--descartada { border-left-color: var(--ink-3); color: var(--ink-3); }
 
 /* Prioridad = marca compacta, sin relleno — distinta de estado, que ahora
    también usa borde lateral: prioridad no lleva fondo ni borde de caja. */

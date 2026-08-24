@@ -30,7 +30,7 @@ async function fetchEspacios() {
 async function fetchCargosVisibles() {
   const { data } = await supabase
     .from('cargos')
-    .select('id, nombre, persona:personas(nombre, apellido)')
+    .select('id, nombre, persona:personas!cargos_persona_id_fkey(nombre, apellido)')
     .eq('activo', true)
     .order('nombre');
   return (data || []).filter((c) => c.persona);
@@ -39,7 +39,7 @@ async function fetchCargosVisibles() {
 async function fetchAsignaciones(fecha) {
   let query = supabase
     .from('asignaciones_espacio')
-    .select('id, fecha, hora_inicio, hora_fin, espacio:espacios(id, nombre), cargo:cargos!asignaciones_espacio_cargo_id_fkey(id, nombre, persona:personas(nombre, apellido))')
+    .select('id, fecha, hora_inicio, hora_fin, espacio:espacios(id, nombre), cargo:cargos!asignaciones_espacio_cargo_id_fkey(id, nombre, persona:personas!cargos_persona_id_fkey(nombre, apellido))')
     .order('fecha', { ascending: false })
     .order('hora_inicio');
   if (fecha) query = query.eq('fecha', fecha);

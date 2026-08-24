@@ -14,7 +14,7 @@ const ESTADO_LABEL = { pendiente: 'Pendiente', aprobada: 'Aprobada', rechazada: 
 async function fetchEvidencias(tareaId) {
   const { data, error } = await supabase
     .from('evidencias')
-    .select('*, autor:cargos!evidencias_autor_cargo_id_fkey(nombre, persona:personas(nombre, apellido))')
+    .select('*, autor:cargos!evidencias_autor_cargo_id_fkey(nombre, persona:personas!cargos_persona_id_fkey(nombre, apellido))')
     .eq('tarea_id', tareaId)
     .order('creada_en', { ascending: false });
   if (error) { mostrarAviso(mensajeError(error), 'error'); return []; }

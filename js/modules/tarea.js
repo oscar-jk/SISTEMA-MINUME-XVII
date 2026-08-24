@@ -24,8 +24,8 @@ async function cargarTarea(id) {
     .select(`
       *,
       actividad:actividades(id, codigo, nombre, fecha),
-      responsable:cargos!tareas_responsable_cargo_id_fkey(id, nombre, persona:personas(nombre, apellido)),
-      supervisor:cargos!tareas_supervisor_cargo_id_fkey(id, nombre, persona:personas(nombre, apellido)),
+      responsable:cargos!tareas_responsable_cargo_id_fkey(id, nombre, persona:personas!cargos_persona_id_fkey(nombre, apellido)),
+      supervisor:cargos!tareas_supervisor_cargo_id_fkey(id, nombre, persona:personas!cargos_persona_id_fkey(nombre, apellido)),
       grupo_trabajo:grupos_trabajo(nombre)
     `)
     .eq('id', id)
@@ -37,7 +37,7 @@ async function cargarTarea(id) {
 async function cargarAvances(id) {
   const { data, error } = await supabase
     .from('avances_tarea')
-    .select('id, nota, progreso_reportado, fecha, autor:cargos!avances_tarea_autor_cargo_id_fkey(nombre, persona:personas(nombre, apellido))')
+    .select('id, nota, progreso_reportado, fecha, autor:cargos!avances_tarea_autor_cargo_id_fkey(nombre, persona:personas!cargos_persona_id_fkey(nombre, apellido))')
     .eq('tarea_id', id)
     .order('fecha', { ascending: true });
   if (error) throw error;
@@ -49,8 +49,8 @@ async function cargarReasignaciones(id) {
     .from('historial_reasignacion_tarea')
     .select(`
       id, campo, cambiado_en,
-      anterior:cargos!historial_reasignacion_tarea_cargo_anterior_id_fkey(nombre, persona:personas(nombre, apellido)),
-      nuevo:cargos!historial_reasignacion_tarea_cargo_nuevo_id_fkey(nombre, persona:personas(nombre, apellido))
+      anterior:cargos!historial_reasignacion_tarea_cargo_anterior_id_fkey(nombre, persona:personas!cargos_persona_id_fkey(nombre, apellido)),
+      nuevo:cargos!historial_reasignacion_tarea_cargo_nuevo_id_fkey(nombre, persona:personas!cargos_persona_id_fkey(nombre, apellido))
     `)
     .eq('tarea_id', id)
     .order('cambiado_en', { ascending: false });

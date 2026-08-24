@@ -27,7 +27,7 @@ async function fetchPersonas() {
 async function fetchCargos() {
   const { data } = await supabase
     .from('cargos')
-    .select('*, persona:personas(nombre, apellido), subsecretaria:subsecretarias(nombre), comision:comisiones(nombre)')
+    .select('*, persona:personas!cargos_persona_id_fkey(nombre, apellido), subsecretaria:subsecretarias(nombre), comision:comisiones(nombre)')
     .order('nombre');
   return data || [];
 }

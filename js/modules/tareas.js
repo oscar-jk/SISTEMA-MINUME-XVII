@@ -64,7 +64,7 @@ async function cargarGrupo() {
   if (!sesion?.cargo.grupo_trabajo_id) return [];
   const { data, error } = await supabase
     .from('tareas')
-    .select('id, titulo, descripcion, estado, prioridad, fecha_limite, progreso, responsable_cargo_id, supervisor_cargo_id, grupo_trabajo_id, responsable:cargos!tareas_responsable_cargo_id_fkey(nombre, persona:personas(nombre, apellido))')
+    .select('id, titulo, descripcion, estado, prioridad, fecha_limite, progreso, responsable_cargo_id, supervisor_cargo_id, grupo_trabajo_id, responsable:cargos!tareas_responsable_cargo_id_fkey(nombre, persona:personas!cargos_persona_id_fkey(nombre, apellido))')
     .eq('grupo_trabajo_id', sesion.cargo.grupo_trabajo_id)
     .order('fecha_limite', { ascending: true, nullsFirst: false });
 

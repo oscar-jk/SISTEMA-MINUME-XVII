@@ -26,8 +26,8 @@ async function cargarTareas(actividadId) {
     .from('tareas')
     .select(`
       id, titulo, estado, progreso, fecha_limite,
-      responsable:cargos!tareas_responsable_cargo_id_fkey(id, nombre, persona:personas(nombre, apellido)),
-      supervisor:cargos!tareas_supervisor_cargo_id_fkey(id, nombre, persona:personas(nombre, apellido))
+      responsable:cargos!tareas_responsable_cargo_id_fkey(id, nombre, persona:personas!cargos_persona_id_fkey(nombre, apellido)),
+      supervisor:cargos!tareas_supervisor_cargo_id_fkey(id, nombre, persona:personas!cargos_persona_id_fkey(nombre, apellido))
     `)
     .eq('actividad_id', actividadId)
     .order('creada_en');
@@ -38,7 +38,7 @@ async function cargarTareas(actividadId) {
 async function cargarCargosVisibles() {
   const { data, error } = await supabase
     .from('cargos')
-    .select('id, nombre, tipo, persona:personas(nombre, apellido)')
+    .select('id, nombre, tipo, persona:personas!cargos_persona_id_fkey(nombre, apellido)')
     .eq('activo', true)
     .order('nombre');
   if (error) return [];

@@ -33,7 +33,7 @@ async function cargarTareas() {
     .select(`
       id, titulo, estado, prioridad, fecha_limite, progreso, responsable_cargo_id, supervisor_cargo_id, grupo_trabajo_id,
       actividad:actividades(id, nombre, codigo, fase:fases_actividad(codigo, nombre, orden)),
-      responsable:cargos!tareas_responsable_cargo_id_fkey(nombre, persona:personas(nombre, apellido))
+      responsable:cargos!tareas_responsable_cargo_id_fkey(nombre, persona:personas!cargos_persona_id_fkey(nombre, apellido))
     `)
     .order('fecha_limite', { ascending: true, nullsFirst: false });
   if (error) { mostrarAviso(mensajeError(error), 'error'); return []; }

@@ -30,6 +30,7 @@ const ENLACES_NAV = [
   { grupo: 'operativo', href: '/checklist.html', texto: 'Checklist', iconoNombre: 'check' },
   { grupo: 'operativo', href: '/calendario.html', texto: 'Calendario', iconoNombre: 'calendario', enBarraInferior: true },
   { grupo: 'operativo', href: '/bandeja.html', texto: 'Bandeja', iconoNombre: 'bandeja', requiere: 'asignar' },
+  { grupo: 'operativo', href: '/solicitudes-ayuda.html', texto: 'Solicitudes de ayuda', iconoNombre: 'alerta' },
   { grupo: 'organizacional', href: '/organigrama.html', texto: 'Organigrama', iconoNombre: 'organigrama' },
   { grupo: 'organizacional', href: '/espacios.html', texto: 'Espacios', iconoNombre: 'edificio' },
   { grupo: 'organizacional', href: '/asistencia.html', texto: 'Asistencia', iconoNombre: 'reloj', enBarraInferior: true },

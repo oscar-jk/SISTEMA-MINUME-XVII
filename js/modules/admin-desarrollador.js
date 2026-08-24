@@ -36,7 +36,7 @@ async function fetchComisiones() {
 async function fetchCargosAltoNivel() {
   const { data } = await supabase
     .from('cargos')
-    .select('id, nombre, tipo, persona:personas(nombre, apellido)')
+    .select('id, nombre, tipo, persona:personas!cargos_persona_id_fkey(nombre, apellido)')
     .in('tipo', ['sg', 'sga', 'sgl'])
     .eq('activo', true);
   return data || [];
@@ -44,7 +44,7 @@ async function fetchCargosAltoNivel() {
 async function fetchPerfilesCreados() {
   const { data } = await supabase
     .from('cargos')
-    .select('id, nombre, tipo, division, persona:personas(nombre, apellido)')
+    .select('id, nombre, tipo, division, persona:personas!cargos_persona_id_fkey(nombre, apellido)')
     .in('tipo', ['sg', 'sga', 'sgl', 'subsecretario'])
     .order('creado_en', { ascending: false });
   return data || [];

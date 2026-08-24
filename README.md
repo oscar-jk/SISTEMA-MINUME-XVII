@@ -86,8 +86,8 @@ exige sesión" — ver "Acreditación de delegados" más abajo.
 
 ```
 /index.html · tablero.html · checklist.html · mis-tareas.html · calendario.html · actividad.html · tarea.html · bandeja.html
-/organigrama.html · espacios.html · asistencia.html
-/admin-personas.html · admin-cuentas.html · admin-catalogos.html · admin-configuracion.html · bitacora.html
+/organigrama.html · espacios.html · asistencia.html · grupos-trabajo.html · solicitudes-ayuda.html
+/admin-personas.html · admin-cuentas.html · admin-catalogos.html · admin-configuracion.html · admin-desarrollador.html · bitacora.html
 /css/                 tokens.css · base.css · componentes.css · vistas.css
 /js/config.js          URL y clave publicable de Supabase
 /js/core/               supabase.js · sesion.js · shell.js · parametros.js · store.js
@@ -210,6 +210,14 @@ frontend — `js/core/permisos.js` solo oculta botones. El detalle está en
   que `0035` añadió a `tareas_select_rama` — encontrado probando en el
   navegador, no en el diseño: un miembro de grupo veía la tarea pero no su
   historial de avances ni de reasignación.
+- `0037` — Bloque B: cierra tres fugas de visibilidad cruzada de rama
+  (`personas_select_sin_cargo`, `subsecretarias`/`comisiones_select`,
+  `acreditados_select`) y añade `solicitudes_ayuda` — ver "Solicitudes de
+  ayuda y recorte de visibilidad" abajo. Añade `personas.creada_por`, lo
+  que introdujo una segunda relación entre `cargos` y `personas` — todo
+  embed `persona:personas(...)` que colgaba de una fila de `cargos` en
+  todo el proyecto necesitó el hint `!cargos_persona_id_fkey` para seguir
+  resolviendo sin ambigüedad (PGRST201).
 
 Las únicas piezas que tocan la clave de servicio de Supabase son las
 Edge Functions (`crear-cuenta`, `restablecer-contrasena`,
@@ -430,6 +438,83 @@ sección "Tareas de mi grupo" debajo de la tabla personal, visible si
 `sesion.cargo.grupo_trabajo_id` existe, con botón "Tomar"/"Liberar" por
 fila; la ficha de una tarea (`tarea.html`) muestra "Grupo destinatario"
 cuando aplica y el mismo botón. No hace falta página ni ruta nueva.
+
+## Solicitudes de ayuda y recorte de visibilidad (Bloque B)
+
+Bloque B de la especificación funcional, dos piezas (`0037`):
+
+**Recorte de visibilidad.** Casi todo ya estaba acotado por rama (`cargos`,
+`tareas`, `tablero`, `bandeja`, `organigrama` ya solo muestran la propia
+rama hacia abajo vía RLS). Tres fugas reales cerradas:
+
+- `personas_select_sin_cargo` (`0022`) dejaba ver a **cualquier**
+  `puede_asignar()` (coordinador incluido) **todas** las personas sin
+  cargo del evento entero, no solo las de su rama — se notaba en la lista
+  de `admin-personas.js`. Se cierra con `es_gestor_de_rama()` (función
+  nueva, espejo de `puedeGestionarRamas(sesion)`: super_admin/sg/sga/sgl/
+  subsecretario, no coordinador) **o** `creada_por = cargo_actual()` —
+  así quien crea una persona y falla el paso de asignarle cargo (el caso
+  real que motivó la política en `0022`) sigue viéndola para terminar el
+  flujo, sin reabrir la fuga para huérfanos ajenos. `personas.creada_por`
+  se fija por trigger (`fn_fijar_creador_persona`), no por lo que mande el
+  cliente — a diferencia de `tareas.creada_por`/`grupos_trabajo.creado_por`
+  (puramente informativos), aquí sí decide una autorización.
+- `subsecretarias_select`/`comisiones_select` eran `using (true)` —
+  cualquiera veía el nombre de cualquier rama. Se acotan a
+  `es_gestor_de_rama()` o la propia rama del cargo activo (necesario:
+  `sesion.js` embebe el nombre de la propia subsecretaría/comisión, y
+  PostgREST exige que esa fila pase la RLS de su propia tabla). **Trampa
+  encontrada al diseñar esto**: `subsecretarias_escritura`/
+  `comisiones_escritura` (`0010`/`0030`) eran `for all` — en Postgres el
+  `using` de un `for all` también gatea SELECT como política permisiva
+  adicional. Reemplazar solo `*_select` habría bajado la fuga de "todos" a
+  `puede_asignar()` (coordinador incluido) sin cerrarla de verdad para el
+  tier que se buscaba excluir. Se dividieron en `insert`/`update`/`delete`
+  separadas, misma autoridad, sin ese efecto secundario sobre SELECT.
+- `acreditados_select` (`verificar.html`) era `using (true)` — cualquier
+  staff, no solo quien asigna. Se acota a `puede_asignar()`. **Cambio
+  operativo real, no solo de datos**: el comentario original de `0028`
+  documentaba esa apertura como deliberada para que un voluntario simple
+  en la puerta pudiera verificar delegados — con este cambio, deja de
+  poder hacerlo.
+
+**Solicitudes de ayuda** (`solicitudes-ayuda.html`, tabla nueva
+`solicitudes_ayuda`, sin precedente previo — no existía tabla, UI ni
+mecanismo de notificación de ningún tipo en el proyecto). Cualquiera pide
+ayuda escalando su propia cadena de supervisión (`destinatario_*` ambos
+`null`); además, quien gestiona alguna rama puede dirigirla a una
+subsecretaría/comisión distinta (`es_gestor_de_rama()` en el insert — un
+coordinador pide ayuda, pero no "en nombre de su rama" hacia otra).
+`puede_atender_solicitud_ayuda()` decide quién puede verla/resolverla:
+sin destino, la cadena de supervisión completa hacia arriba
+(`es_ascendiente_de(solicitante)`, no solo el superior directo, para que
+no se atasque si ese superior no está disponible); con destino,
+`puede_gestionar_rama()` sobre esa rama específica, sin relación con la
+cadena del solicitante.
+
+Mismo reparto que `fn_toma_voluntaria_tarea` (Bloque A): RLS decide qué
+filas puede tocar cada quien, un trigger (`fn_transicion_solicitud_ayuda`)
+decide con precisión qué cambia. **Hallazgo real durante el diseño**:
+`es_ascendiente_de()` es auto-inclusiva, así que para una solicitud
+escalada `puede_atender_solicitud_ayuda(mi_propio_id, null, null)`
+también da `true` para el propio solicitante — un trigger que solo
+comprobara "¿puede atenderla?" antes de "¿soy el solicitante?" habría
+dejado que alguien resolviera su propia solicitud escalada. El chequeo de
+identidad va primero y es excluyente. Estados terminales (`atendida`/
+`descartada`) no aceptan más cambios salvo de super_admin; `atendida_por`/
+`atendida_en` los fija siempre el servidor, y solo junto con el cambio de
+`estado` en el mismo `UPDATE`, nunca por separado. Sin bitácora — la
+tabla ya es su propio rastro completo, mismo criterio que
+`historial_reasignacion_tarea` en Bloque A.
+
+**Nota de PostgREST para quien toque `personas.creada_por`**: añadir esa
+columna creó una SEGUNDA relación entre `cargos` y `personas` (la
+original, `cargos.persona_id`, más esta nueva). Cualquier embed
+`persona:personas(...)` colgado de una fila de `cargos` en cualquier
+parte del proyecto se volvió ambiguo (`PGRST201`) hasta agregar el hint
+`persona:personas!cargos_persona_id_fkey(...)` — rompió la carga de
+sesión y una docena de módulos más, encontrado recién al probar en el
+navegador después de aplicar la migración, no al diseñarla.
 
 ## Actualizar `supabase-js`
 

@@ -17,7 +17,7 @@ async function cargar() {
     .select(`
       id, titulo, estado, fecha_limite, progreso,
       actividad:actividades(codigo, nombre),
-      responsable:cargos!tareas_responsable_cargo_id_fkey(nombre, persona:personas(nombre, apellido))
+      responsable:cargos!tareas_responsable_cargo_id_fkey(nombre, persona:personas!cargos_persona_id_fkey(nombre, apellido))
     `)
     .order('fecha_limite', { ascending: true, nullsFirst: false });
   if (error) {

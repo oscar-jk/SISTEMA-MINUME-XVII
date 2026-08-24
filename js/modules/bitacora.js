@@ -22,7 +22,7 @@ const ACCION_LABEL = {
 async function cargar(filtros) {
   let query = supabase
     .from('bitacora')
-    .select('id, tabla, accion, detalle, creado_en, cargo:cargos(nombre, persona:personas(nombre, apellido))')
+    .select('id, tabla, accion, detalle, creado_en, cargo:cargos(nombre, persona:personas!cargos_persona_id_fkey(nombre, apellido))')
     .order('creado_en', { ascending: false })
     .limit(200);
 

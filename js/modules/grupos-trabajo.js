@@ -48,7 +48,7 @@ async function fetchConteoMiembros() {
 async function fetchMiembros(grupoId) {
   const { data } = await supabase
     .from('cargos')
-    .select('id, nombre, persona:personas(nombre, apellido)')
+    .select('id, nombre, persona:personas!cargos_persona_id_fkey(nombre, apellido)')
     .eq('grupo_trabajo_id', grupoId)
     .order('nombre');
   return data || [];
@@ -56,7 +56,7 @@ async function fetchMiembros(grupoId) {
 async function fetchTareasGrupo(grupoId) {
   const { data } = await supabase
     .from('tareas')
-    .select('id, titulo, estado, prioridad, fecha_limite, responsable_cargo_id, responsable:cargos!tareas_responsable_cargo_id_fkey(nombre, persona:personas(nombre, apellido))')
+    .select('id, titulo, estado, prioridad, fecha_limite, responsable_cargo_id, responsable:cargos!tareas_responsable_cargo_id_fkey(nombre, persona:personas!cargos_persona_id_fkey(nombre, apellido))')
     .eq('grupo_trabajo_id', grupoId)
     .order('fecha_limite', { ascending: true, nullsFirst: false });
   return data || [];
@@ -64,7 +64,7 @@ async function fetchTareasGrupo(grupoId) {
 async function fetchCandidatos(grupo) {
   let query = supabase
     .from('cargos')
-    .select('id, nombre, persona:personas(nombre, apellido)')
+    .select('id, nombre, persona:personas!cargos_persona_id_fkey(nombre, apellido)')
     .eq('activo', true)
     .is('grupo_trabajo_id', null)
     .not('persona_id', 'is', null);

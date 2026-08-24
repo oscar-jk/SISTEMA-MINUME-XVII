@@ -25,7 +25,7 @@ async function cargarPerfil(userId) {
         subsecretaria:subsecretarias(nombre), comision:comisiones(nombre),
         grupo_trabajo_id,
         grupo_trabajo:grupos_trabajo!cargos_grupo_trabajo_id_fkey(nombre, hora_inicio, hora_fin, activo, espacio:espacios(nombre)),
-        superior:superior_id(nombre, persona:personas(nombre, apellido, telefono, correo))
+        superior:superior_id(nombre, persona:personas!cargos_persona_id_fkey(nombre, apellido, telefono, correo))
       `)
       .eq('persona_id', usuario.persona_id)
       .eq('activo', true)
