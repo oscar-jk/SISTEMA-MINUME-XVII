@@ -27,8 +27,16 @@ async function fetchPersonas() {
 async function fetchCargos() {
   const { data } = await supabase
     .from('cargos')
-    .select('*, persona:personas(nombre, apellido)')
+    .select('*, persona:personas(nombre, apellido), subsecretaria:subsecretarias(nombre), comision:comisiones(nombre)')
     .order('nombre');
+  return data || [];
+}
+async function fetchSubsecretarias() {
+  const { data } = await supabase.from('subsecretarias').select('id, nombre, division').order('nombre');
+  return data || [];
+}
+async function fetchComisiones() {
+  const { data } = await supabase.from('comisiones').select('id, nombre').order('nombre');
   return data || [];
 }
 
@@ -171,7 +179,9 @@ function abrirModalSustitucion(cargo, personas, alTerminar) {
 }
 
 async function pintarCargos(el) {
-  const [personas, cargos] = await Promise.all([fetchPersonas(), fetchCargos()]);
+  const [personas, cargos, subsecretarias, comisiones] = await Promise.all([
+    fetchPersonas(), fetchCargos(), fetchSubsecretarias(), fetchComisiones(),
+  ]);
   el.innerHTML = `
     <form class="formulario" data-form-cargo>
       <div class="formulario__fila">
@@ -182,15 +192,47 @@ async function pintarCargos(el) {
         <label class="campo"><span>División</span><select name="division">${opcionesSelect(DIVISIONES, { valor: 'v', etiqueta: 't', vacio: 'Sin división' })}</select></label>
         <label class="campo"><span>Persona (opcional, deja vacante)</span><select name="persona_id">${opcionesSelect(personas, { valor: 'id', etiqueta: nombreCompleto, vacio: 'Vacante' })}</select></label>
       </div>
-      <div class="formulario__fila">
-        <label class="campo"><span>Subsecretaría</span><input name="subsecretaria" /></label>
-        <label class="campo"><span>Comisión</span><input name="comision" /></label>
+      <div class="formulario__fila" data-catalogo-subsecretaria hidden>
+        <label class="campo"><span>Subsecretaría</span><select name="subsecretaria_id"></select></label>
+      </div>
+      <div class="formulario__fila" data-catalogo-comision hidden>
+        <label class="campo"><span>Comisión</span><select name="comision_id">${opcionesSelect(comisiones, { valor: 'id', etiqueta: 'nombre', vacio: 'Sin comisión' })}</select></label>
       </div>
       <label class="campo"><span>Superior jerárquico</span><select name="superior_id">${opcionesSelect(cargos, { valor: 'id', etiqueta: (c) => `${nombreCompleto(c.persona)} · ${c.nombre}`, vacio: 'Sin superior (raíz)' })}</select></label>
       <button type="submit" class="boton boton--primario boton--ancho">${icono('mas', { tamano: 16 })} Crear cargo</button>
     </form>
     <div data-lista></div>
   `;
+
+  // La subsecretaría válida depende de la división elegida (solo SG/SGL
+  // tienen subsecretarías; SGA usa comisiones) — mismo patrón de
+  // mostrar/ocultar que ya usa este archivo para "crear cargo nuevo" en
+  // pintarPersonas(). fn_validar_estructura_cargo() (0030) es quien de
+  // verdad exige esta correspondencia; aquí solo se evita ofrecer una
+  // combinación que el backend va a rechazar.
+  const selectDivision = el.querySelector('[name="division"]');
+  const bloqueSubsecretaria = el.querySelector('[data-catalogo-subsecretaria]');
+  const bloqueComision = el.querySelector('[data-catalogo-comision]');
+  const selectSubsecretariaId = el.querySelector('[name="subsecretaria_id"]');
+  const selectComisionId = el.querySelector('[name="comision_id"]');
+
+  function actualizarBloqueCatalogo() {
+    const division = selectDivision.value;
+    bloqueComision.hidden = division !== 'sga';
+    bloqueSubsecretaria.hidden = !(division === 'sg' || division === 'sgl');
+    if (bloqueComision.hidden) selectComisionId.value = '';
+    if (bloqueSubsecretaria.hidden) {
+      selectSubsecretariaId.innerHTML = '';
+    } else {
+      selectSubsecretariaId.innerHTML = opcionesSelect(
+        subsecretarias.filter((s) => s.division === division),
+        { valor: 'id', etiqueta: 'nombre', vacio: 'Sin subsecretaría' },
+      );
+    }
+  }
+  selectDivision.addEventListener('change', actualizarBloqueCatalogo);
+  actualizarBloqueCatalogo();
+
   el.querySelector('[data-form-cargo]').addEventListener('submit', async (e) => {
     e.preventDefault();
     const datos = datosFormulario(e.target);
@@ -211,6 +253,12 @@ async function pintarCargos(el) {
     { clave: 'nombre', titulo: 'Cargo' },
     { clave: 'tipo', titulo: 'Tipo' },
     { clave: 'division', titulo: 'División', render: (c) => (c.division || '—').toUpperCase() },
+    {
+      clave: 'rama',
+      titulo: 'Subsecretaría / Comisión',
+      render: (c) => c.subsecretaria?.nombre || c.comision?.nombre || '—',
+      ordenarPor: (c) => c.subsecretaria?.nombre || c.comision?.nombre || '',
+    },
     { clave: 'persona', titulo: 'Ocupante', html: true, render: (c) => (c.persona ? escapeHtml(nombreCompleto(c.persona)) : '<em>Vacante</em>'), ordenarPor: (c) => nombreCompleto(c.persona) },
     { clave: 'activo', titulo: 'Activo', render: (c) => (c.activo ? 'Sí' : 'No') },
     { clave: 'acceso_salud_acreditacion', titulo: 'Acceso a salud', render: (c) => (c.acceso_salud_acreditacion ? 'Sí' : 'No') },

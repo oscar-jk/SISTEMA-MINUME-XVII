@@ -195,6 +195,9 @@ frontend — `js/core/permisos.js` solo oculta botones. El detalle está en
   delegados" abajo.
 - `0029` — `regionales` con lectura pública (`anon`): el formulario de
   registro la necesita antes de iniciar sesión, que no tiene.
+- `0030`-`0032` — normaliza `cargos.subsecretaria`/`comision` (texto
+  libre) a FKs contra `subsecretarias`/`comisiones` — ver "Subsecretarías
+  y comisiones" abajo.
 
 Las únicas piezas que tocan la clave de servicio de Supabase son las
 Edge Functions (`crear-cuenta`, `restablecer-contrasena`,
@@ -239,6 +242,45 @@ cuando `sesion.cargos.length > 1`. Se descartó la alternativa de evaluar
 permisos como unión de todos los cargos activos porque cada política RLS
 recursiva (`es_descendiente`, `es_ascendiente_de`) pasaría de una CTE por
 fila a N CTEs unidas — con 163 cargos, un costo de rendimiento real.
+
+## Subsecretarías y comisiones
+
+`cargos.subsecretaria`/`cargos.comision` eran texto libre desde el primer
+día del esquema, sin FK — dos administradores podían escribir "Salones" y
+"salones" y el sistema los trataba como ramas distintas (afectaba el
+tablero, que agrupaba por ese texto, y la tolerancia de puntualidad, que
+lo emparejaba por igualdad exacta de string). `0030`-`0032` lo normaliza:
+
+- **SGA se organiza por comisiones**, no por subsecretarías — tabla
+  `comisiones` (`id`, `codigo`, `nombre`, `activa`), sembrada con las 15
+  reales del organigrama (CTD, PNUD, CSNU, ONUDC, CIJ, ONUDI, UNCTAD, OMT,
+  CIME, COP31, AMS, FSCDH, OMA, CRPD, UNESCO Juventud y Deporte).
+- **SG y SGL se organizan por subsecretarías** — la tabla `subsecretarias`
+  (ya existía, `0010`) gana una columna `division` (`sg`/`sgl`, nunca
+  `sga`). Se sembraron las 3 que reportan directo a SG (Planificación y
+  Desarrollo, Comunicaciones y Relaciones Intercomisional, Tecnología de
+  la Información); las 5 de SGL se cargan desde Admin → Catálogos cuando
+  se confirmen sus nombres reales — **a propósito no se inventaron
+  placeholders**.
+- `cargos.subsecretaria_id`/`comision_id` (FK, mutuamente excluyentes)
+  reemplazan el texto libre. Un trigger nuevo, `fn_validar_estructura_cargo`
+  (`0030`, corre en INSERT y UPDATE, distinto de `fn_validar_cambio_cargo`
+  que protege contra auto-escalada de privilegios), exige que `comision_id`
+  solo se use con `division='sga'`, que `subsecretaria_id` solo se use con
+  `division` en `('sg','sgl')` y que la `subsecretarias.division` de la
+  fila elegida coincida con la del cargo.
+- `tolerancias_puntualidad` recibió el mismo tratamiento
+  (`subsecretaria_id`/`comision_id`, índices únicos parciales en vez del
+  `unique` sobre texto de antes). El formulario en Admin → Configuración
+  ya no puede usar `upsert({onConflict: 'subsecretaria'})` — un conflict
+  target no puede llevar el predicado `WHERE` de un índice parcial vía
+  PostgREST — así que hace un select-then-insert-or-update explícito.
+- Los cargos y la fila `subsecretarias` sembrados antes de esta migración
+  (`'Operaciones'`, `'Academica'`, `'Salones'` — datos de prueba, nunca
+  correspondieron al organigrama real) quedaron sin catalogar a propósito:
+  no había forma de remapear ese texto libre a una fila real sin
+  inventar una, así que se dejaron con `subsecretaria_id`/`comision_id`
+  en `null` en vez de borrarse.
 
 ## Actualizar `supabase-js`
 
@@ -349,10 +391,13 @@ como delegado, mesa directiva, prensa, staff, etc. (9 roles, distintos de
 
 Del catálogo maestro de 172 funcionalidades: evaluación por cortes
 (rúbricas/pesos — las tablas base ya existen sin usar, ver
-`criterios_evaluacion`/`evaluaciones`/`es_evaluador_de()`), comisiones
-como estructura propia, consolidados en tiempo real, reportes y
-exportación, croquis público (vista de solo lectura del plano sin
-sesión — el croquis en vivo actual sí exige login), planificación
+`criterios_evaluacion`/`evaluaciones`/`es_evaluador_de()`), poblar los
+cargos reales de cada comisión/subsecretaría (el catálogo de las 15
+comisiones y las 3+5 subsecretarías ya existe — ver "Subsecretarías y
+comisiones" — pero los cargos concretos de cada una todavía no se cargan;
+eso depende del panel de desarrollador y grupos de trabajo), consolidados
+en tiempo real, reportes y exportación, croquis público (vista de solo
+lectura del plano sin sesión — el croquis en vivo actual sí exige login), planificación
 estratégica, hospedaje detallado más allá de lo que ya captura
 acreditación (número de habitación/compañero/líder de edificio), y
 auditoría completa (esta ronda solo tiene la bitácora mínima). También

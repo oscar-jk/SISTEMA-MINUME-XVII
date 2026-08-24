@@ -82,11 +82,19 @@ async function pintarEspacios(el) {
   ], filas));
 }
 
+// Solo SG y SGL se organizan por subsecretaría — SGA usa comisiones (ver
+// pintarComisiones). Las dos filas sembradas antes de 0030 ('Operaciones',
+// 'Academica') no tenían división real y se dejaron sin clasificar a
+// propósito: aparecen aquí con "—" y no las ve ningún selector de cargo
+// filtrado por división.
+const DIVISIONES_SUBSECRETARIA = [{ v: 'sg', t: 'SG' }, { v: 'sgl', t: 'SGL' }];
+
 async function pintarSubsecretarias(el) {
   const filas = await fetchTabla('subsecretarias');
   el.innerHTML = `
     <form class="formulario formulario--en-linea" data-form>
       <input name="nombre" placeholder="Nombre" required />
+      <select name="division" required>${opcionesSelect(DIVISIONES_SUBSECRETARIA, { valor: 'v', etiqueta: 't' })}</select>
       <button type="submit" class="boton boton--primario">${icono('mas', { tamano: 16 })} Añadir</button>
     </form>
     <div data-lista></div>
@@ -99,6 +107,31 @@ async function pintarSubsecretarias(el) {
     await pintarSubsecretarias(el);
   });
   el.querySelector('[data-lista]').replaceChildren(crearTabla([
+    { clave: 'nombre', titulo: 'Nombre' },
+    { clave: 'division', titulo: 'División', render: (f) => (f.division || '—').toUpperCase() },
+    { clave: 'activa', titulo: 'Activa', render: (f) => (f.activa ? 'Sí' : 'No') },
+  ], filas));
+}
+
+async function pintarComisiones(el) {
+  const filas = await fetchTabla('comisiones');
+  el.innerHTML = `
+    <form class="formulario formulario--en-linea" data-form>
+      <input name="codigo" placeholder="Código (ej. CTD)" required />
+      <input name="nombre" placeholder="Nombre" required />
+      <button type="submit" class="boton boton--primario">${icono('mas', { tamano: 16 })} Añadir</button>
+    </form>
+    <div data-lista></div>
+  `;
+  el.querySelector('[data-form]').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const { error } = await supabase.from('comisiones').insert(datosFormulario(e.target));
+    if (error) { mostrarAviso(mensajeError(error), 'error'); return; }
+    mostrarAviso('Comisión añadida.', 'exito');
+    await pintarComisiones(el);
+  });
+  el.querySelector('[data-lista]').replaceChildren(crearTabla([
+    { clave: 'codigo', titulo: 'Código' },
     { clave: 'nombre', titulo: 'Nombre' },
     { clave: 'activa', titulo: 'Activa', render: (f) => (f.activa ? 'Sí' : 'No') },
   ], filas));
@@ -192,6 +225,7 @@ const PESTANAS = {
   propiedades: { titulo: 'Propiedades', pintar: pintarPropiedades },
   espacios: { titulo: 'Espacios', pintar: pintarEspacios },
   subsecretarias: { titulo: 'Subsecretarías', pintar: pintarSubsecretarias },
+  comisiones: { titulo: 'Comisiones', pintar: pintarComisiones },
   fases: { titulo: 'Fases', pintar: pintarFases },
   regionales: { titulo: 'Regionales', pintar: pintarRegionales },
 };

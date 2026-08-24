@@ -19,7 +19,7 @@ let busqueda = '';
 async function cargar() {
   const { data, error } = await supabase
     .from('cargos')
-    .select('id, nombre, tipo, division, subsecretaria, comision, superior_id, activo, persona:personas(nombre, apellido, correo, telefono)')
+    .select('id, nombre, tipo, division, subsecretaria:subsecretarias(nombre), comision:comisiones(nombre), superior_id, activo, persona:personas(nombre, apellido, correo, telefono)')
     .eq('activo', true)
     .order('nombre');
   if (error) {
@@ -96,8 +96,8 @@ function coincideBusqueda(cargo, texto) {
   return nombreCompleto(cargo.persona).toLowerCase().includes(q)
     || cargo.nombre.toLowerCase().includes(q)
     || (cargo.persona?.correo || '').toLowerCase().includes(q)
-    || (cargo.subsecretaria || '').toLowerCase().includes(q)
-    || (cargo.comision || '').toLowerCase().includes(q);
+    || (cargo.subsecretaria?.nombre || '').toLowerCase().includes(q)
+    || (cargo.comision?.nombre || '').toLowerCase().includes(q);
 }
 
 function pintarDirectorio(el) {
@@ -116,8 +116,8 @@ function pintarDirectorio(el) {
     {
       clave: 'rama',
       titulo: 'División / rama',
-      render: (c) => [c.division ? c.division.toUpperCase() : null, c.subsecretaria, c.comision].filter(Boolean).join(' · ') || '—',
-      ordenarPor: (c) => [c.division, c.subsecretaria, c.comision].filter(Boolean).join(' '),
+      render: (c) => [c.division ? c.division.toUpperCase() : null, c.subsecretaria?.nombre, c.comision?.nombre].filter(Boolean).join(' · ') || '—',
+      ordenarPor: (c) => [c.division, c.subsecretaria?.nombre, c.comision?.nombre].filter(Boolean).join(' '),
     },
     {
       clave: 'correo',

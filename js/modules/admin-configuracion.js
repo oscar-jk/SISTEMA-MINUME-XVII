@@ -5,7 +5,7 @@ import { supabase } from '../core/supabase.js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../config.js';
 import { icono } from '../ui/icono.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
-import { datosFormulario } from '../ui/formulario.js';
+import { datosFormulario, opcionesSelect } from '../ui/formulario.js';
 import { crearTabla } from '../ui/tabla.js';
 
 let contenedor = null;
@@ -95,30 +95,62 @@ async function pintarFechasYPurga(el, config) {
 }
 
 async function pintarTolerancias(el) {
-  const { data: filas } = await supabase.from('tolerancias_puntualidad').select('*').order('subsecretaria');
+  const [{ data: subsecretarias }, { data: comisiones }, { data: filas }] = await Promise.all([
+    supabase.from('subsecretarias').select('id, nombre').order('nombre'),
+    supabase.from('comisiones').select('id, nombre').order('nombre'),
+    supabase.from('tolerancias_puntualidad').select('*, subsecretaria:subsecretarias(nombre), comision:comisiones(nombre)'),
+  ]);
   el.innerHTML = `
     <h3 class="subtitulo" style="margin-top:0">Tolerancias de puntualidad</h3>
     <form class="formulario" data-form>
       <div class="formulario__fila">
-        <label class="campo"><span>Subsecretaría</span><input name="subsecretaria" required /></label>
+        <label class="campo">
+          <span>Rama</span>
+          <select name="objetivo" required>
+            <option value="">Elige una rama</option>
+            <optgroup label="Subsecretarías">${opcionesSelect(subsecretarias || [], { valor: (s) => `sub:${s.id}`, etiqueta: 'nombre' })}</optgroup>
+            <optgroup label="Comisiones">${opcionesSelect(comisiones || [], { valor: (c) => `com:${c.id}`, etiqueta: 'nombre' })}</optgroup>
+          </select>
+        </label>
         <label class="campo"><span>Hora programada</span><input name="hora_programada" type="time" required /></label>
         <label class="campo"><span>Tolerancia (minutos)</span><input name="tolerancia_minutos" type="number" min="0" value="10" required /></label>
       </div>
-      <button type="submit" class="boton boton--secundario">${icono('mas', { tamano: 16 })} Añadir</button>
+      <button type="submit" class="boton boton--secundario">${icono('mas', { tamano: 16 })} Guardar</button>
     </form>
     <div data-lista></div>
   `;
   el.querySelector('[data-form]').addEventListener('submit', async (e) => {
     e.preventDefault();
     const datos = datosFormulario(e.target);
-    datos.tolerancia_minutos = Number(datos.tolerancia_minutos);
-    const { error } = await supabase.from('tolerancias_puntualidad').upsert(datos, { onConflict: 'subsecretaria' });
+    const [prefijo, id] = (datos.objetivo || '').split(':');
+    if (!prefijo || !id) { mostrarAviso('Elige una rama.', 'error'); return; }
+    const fila = {
+      subsecretaria_id: prefijo === 'sub' ? id : null,
+      comision_id: prefijo === 'com' ? id : null,
+      hora_programada: datos.hora_programada,
+      tolerancia_minutos: Number(datos.tolerancia_minutos),
+    };
+    // upsert con onConflict no sirve aquí: el "conflicto" real está en un
+    // índice único PARCIAL (where subsecretaria_id/comision_id is not
+    // null, ver 0030), y PostgREST no puede inferir ese predicado — se
+    // resuelve con un select-then-insert-or-update explícito.
+    const columna = fila.subsecretaria_id ? 'subsecretaria_id' : 'comision_id';
+    const valor = fila.subsecretaria_id || fila.comision_id;
+    const { data: existente } = await supabase.from('tolerancias_puntualidad').select('id').eq(columna, valor).maybeSingle();
+    const { error } = existente
+      ? await supabase.from('tolerancias_puntualidad').update(fila).eq('id', existente.id)
+      : await supabase.from('tolerancias_puntualidad').insert(fila);
     if (error) { mostrarAviso(mensajeError(error), 'error'); return; }
     mostrarAviso('Tolerancia guardada.', 'exito');
     await pintarTolerancias(el);
   });
   el.querySelector('[data-lista]').replaceChildren(crearTabla([
-    { clave: 'subsecretaria', titulo: 'Subsecretaría' },
+    {
+      clave: 'rama',
+      titulo: 'Rama',
+      render: (f) => f.subsecretaria?.nombre || f.comision?.nombre || '—',
+      ordenarPor: (f) => f.subsecretaria?.nombre || f.comision?.nombre || '',
+    },
     { clave: 'hora_programada', titulo: 'Hora programada', render: (f) => f.hora_programada.slice(0, 5) },
     { clave: 'tolerancia_minutos', titulo: 'Tolerancia (min)' },
   ], filas || []));

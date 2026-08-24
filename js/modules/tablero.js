@@ -110,7 +110,7 @@ export async function render(el) {
 
   el.querySelector('[data-avance]').replaceChildren(crearTabla([
     { clave: 'division', titulo: 'División', render: (f) => (f.division || '—').toUpperCase() },
-    { clave: 'subsecretaria', titulo: 'Subsecretaría' },
+    { clave: 'rama', titulo: 'Subsecretaría / Comisión' },
     { clave: 'completadas', titulo: 'Completadas' },
     { clave: 'total', titulo: 'Total' },
     { clave: 'porcentaje_avance', titulo: '% avance', render: (f) => (f.porcentaje_avance === null ? '—' : `${f.porcentaje_avance}%`) },
