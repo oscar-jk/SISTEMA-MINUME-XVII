@@ -9,21 +9,39 @@ import { icono } from '../ui/icono.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 import { etiquetaPlazo, estaVencida } from '../utils/fechas.js';
 import { esqueletoTabla } from '../ui/esqueleto.js';
+import { opcionesSelect } from '../ui/formulario.js';
 import {
   ESTADO_TAREA_LABEL, nombreCompleto, escapeHtml, esPrioridadAlta,
 } from '../utils/formato.js';
-import { puedeRegistrarAvance, puedeEnviarRevision, puedeAprobarODevolver } from '../core/permisos.js';
+import {
+  puedeRegistrarAvance, puedeEnviarRevision, puedeAprobarODevolver, puedeMarcarNoAplica,
+} from '../core/permisos.js';
 import { abrirHojaAvance, enviarARevision } from './tareas.js';
-import { aprobar, abrirHojaDevolucion } from './bandeja.js';
+import { aprobar, abrirHojaDevolucion, marcarNoAplica } from './bandeja.js';
 
 let contenedor = null;
 let tareasCache = [];
-let filtros = { fase: '', estado: '', texto: '' };
+let filtros = {
+  fase: '', estado: '', texto: '', rama: '',
+};
+let subsecretariasCache = [];
+let comisionesCache = [];
 
 const FASE_SIN_FASE = { codigo: '', nombre: 'Sin fase / general', orden: 99 };
+const DIVISIONES = [{ v: 'sg', t: 'SG' }, { v: 'sga', t: 'SGA' }, { v: 'sgl', t: 'SGL' }];
 
 async function cargarFases() {
   const { data } = await supabase.from('fases_actividad').select('codigo, nombre, orden').order('orden');
+  return data || [];
+}
+
+async function cargarSubsecretarias() {
+  const { data } = await supabase.from('subsecretarias').select('id, nombre, division').order('nombre');
+  return data || [];
+}
+
+async function cargarComisiones() {
+  const { data } = await supabase.from('comisiones').select('id, nombre').order('nombre');
   return data || [];
 }
 
@@ -32,12 +50,32 @@ async function cargarTareas() {
     .from('tareas')
     .select(`
       id, titulo, estado, prioridad, fecha_limite, progreso, responsable_cargo_id, supervisor_cargo_id, grupo_trabajo_id,
-      actividad:actividades(id, nombre, codigo, fase:fases_actividad(codigo, nombre, orden)),
+      actividad:actividades(id, nombre, codigo, subsecretaria_id, comision_id, fase:fases_actividad(codigo, nombre, orden)),
+      grupo_trabajo:grupos_trabajo(subsecretaria_id, comision_id),
       responsable:cargos!tareas_responsable_cargo_id_fkey(nombre, persona:personas!cargos_persona_id_fkey(nombre, apellido))
     `)
     .order('fecha_limite', { ascending: true, nullsFirst: false });
   if (error) { mostrarAviso(mensajeError(error), 'error'); return []; }
   return data;
+}
+
+// Bloque C — la rama efectiva de una tarea: gana el primer valor no-nulo
+// entre la rama de su actividad y la de su grupo de trabajo destinatario.
+// No "gana actividad porque existe actividad_id": una actividad general del
+// evento (ambas ramas null) no debe tapar una rama real que sí venga del
+// grupo de trabajo.
+function resolverRama(t) {
+  if (t.actividad?.subsecretaria_id) return { tipo: 'sub', id: t.actividad.subsecretaria_id };
+  if (t.actividad?.comision_id) return { tipo: 'com', id: t.actividad.comision_id };
+  if (t.grupo_trabajo?.subsecretaria_id) return { tipo: 'sub', id: t.grupo_trabajo.subsecretaria_id };
+  if (t.grupo_trabajo?.comision_id) return { tipo: 'com', id: t.grupo_trabajo.comision_id };
+  return null;
+}
+
+function nombreRama(rama) {
+  if (!rama) return null;
+  const lista = rama.tipo === 'sub' ? subsecretariasCache : comisionesCache;
+  return lista.find((x) => x.id === rama.id)?.nombre || null;
 }
 
 function coincideTexto(t, texto) {
@@ -48,10 +86,17 @@ function coincideTexto(t, texto) {
     || nombreCompleto(t.responsable?.persona).toLowerCase().includes(q);
 }
 
+function coincideRama(t) {
+  if (!filtros.rama) return true;
+  const rama = resolverRama(t);
+  return !!rama && `${rama.tipo}:${rama.id}` === filtros.rama;
+}
+
 function aplicarFiltros(lista) {
   return lista.filter((t) => (
     (!filtros.fase || (t.actividad?.fase?.codigo || '') === filtros.fase)
     && (!filtros.estado || t.estado === filtros.estado)
+    && coincideRama(t)
     && coincideTexto(t, filtros.texto)
   ));
 }
@@ -67,19 +112,21 @@ function agruparPorFase(lista) {
 }
 
 function contarCompletadas(lista) {
-  return lista.filter((t) => t.estado === 'completada').length;
+  return lista.filter((t) => t.estado === 'completada' || t.estado === 'no_aplica').length;
 }
 
 function filaTarea(tarea, alTerminar) {
   const { sesion } = getEstado();
   const vencida = estaVencida(tarea);
   const completada = tarea.estado === 'completada';
+  const nombreDeRama = nombreRama(resolverRama(tarea));
   const tr = document.createElement('tr');
   tr.innerHTML = `
     <td class="checklist__marca">${completada ? icono('check-circulo', { tamano: 18, clase: 'checklist__check' }) : ''}</td>
     <td>
       ${esPrioridadAlta(tarea.prioridad) ? icono('estrella', { tamano: 12, clase: 'marcador-prioridad' }) : ''}<a href="/tarea.html?id=${tarea.id}">${escapeHtml(tarea.titulo)}</a>
       ${tarea.actividad ? `<div class="texto-mudo texto-pequeno">${escapeHtml(tarea.actividad.codigo)} · ${escapeHtml(tarea.actividad.nombre)}</div>` : ''}
+      ${nombreDeRama ? `<div class="texto-mudo texto-pequeno">${escapeHtml(nombreDeRama)}</div>` : ''}
     </td>
     <td>${tarea.responsable ? escapeHtml(nombreCompleto(tarea.responsable.persona)) : (tarea.grupo_trabajo_id ? '<span class="texto-mudo">Disponible</span>' : escapeHtml(nombreCompleto(tarea.responsable?.persona)))}</td>
     <td class="${vencida ? 'texto-danger' : ''}">${etiquetaPlazo(tarea)}</td>
@@ -117,6 +164,14 @@ function filaTarea(tarea, alTerminar) {
     devolverBtn.textContent = 'Devolver';
     devolverBtn.addEventListener('click', () => abrirHojaDevolucion(tarea, alTerminar));
     acciones.append(aprobarBtn, devolverBtn);
+  }
+  if (puedeMarcarNoAplica(sesion, tarea)) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'boton boton--fantasma boton--pequeno';
+    b.textContent = 'No aplica';
+    b.addEventListener('click', () => marcarNoAplica(tarea, alTerminar));
+    acciones.appendChild(b);
   }
   return tr;
 }
@@ -169,7 +224,11 @@ async function recargar() {
 
 export async function render(el) {
   contenedor = el;
-  const fases = await cargarFases();
+  const [fases, subsecretarias, comisiones] = await Promise.all([
+    cargarFases(), cargarSubsecretarias(), cargarComisiones(),
+  ]);
+  subsecretariasCache = subsecretarias;
+  comisionesCache = comisiones;
   const opcionesEstado = Object.entries(ESTADO_TAREA_LABEL);
 
   el.innerHTML = `
@@ -187,9 +246,43 @@ export async function render(el) {
         <button type="button" class="chip chip--activo" data-estado="">Todos los estados</button>
         ${opcionesEstado.map(([clave, etiqueta]) => `<button type="button" class="chip" data-estado="${clave}">${escapeHtml(etiqueta)}</button>`).join('')}
       </div>
+      <div class="checklist-filtro-rama">
+        <select data-division>${opcionesSelect(DIVISIONES, { valor: 'v', etiqueta: 't', vacio: 'Toda división' })}</select>
+        <select data-rama disabled><option value="">Toda rama</option></select>
+      </div>
     </div>
     <div data-cuerpo>${esqueletoTabla()}</div>
   `;
+
+  const selectDivision = el.querySelector('[data-division]');
+  const selectRama = el.querySelector('[data-rama]');
+
+  function actualizarCatalogoRama() {
+    const division = selectDivision.value;
+    if (!division) {
+      selectRama.innerHTML = '<option value="">Toda rama</option>';
+      selectRama.disabled = true;
+    } else if (division === 'sga') {
+      selectRama.disabled = false;
+      selectRama.innerHTML = opcionesSelect(
+        comisiones,
+        { valor: (c) => `com:${c.id}`, etiqueta: 'nombre', vacio: 'Toda comisión' },
+      );
+    } else {
+      selectRama.disabled = false;
+      selectRama.innerHTML = opcionesSelect(
+        subsecretarias.filter((s) => s.division === division),
+        { valor: (s) => `sub:${s.id}`, etiqueta: 'nombre', vacio: 'Toda subsecretaría' },
+      );
+    }
+    filtros.rama = '';
+    pintar();
+  }
+  selectDivision.addEventListener('change', actualizarCatalogoRama);
+  selectRama.addEventListener('change', () => {
+    filtros.rama = selectRama.value;
+    pintar();
+  });
 
   el.querySelector('[data-buscar]').addEventListener('input', (e) => {
     filtros.texto = e.target.value.trim();

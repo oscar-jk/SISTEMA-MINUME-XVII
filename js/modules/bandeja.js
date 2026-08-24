@@ -7,6 +7,7 @@ import { etiquetaPlazo, estaVencida } from '../utils/fechas.js';
 import { esqueletoTabla } from '../ui/esqueleto.js';
 import { crearTabla } from '../ui/tabla.js';
 import { ESTADO_TAREA_LABEL, nombreCompleto, escapeHtml } from '../utils/formato.js';
+import { puedeAprobarODevolver, puedeMarcarNoAplica } from '../core/permisos.js';
 
 let contenedor = null;
 let tareas = [];
@@ -15,7 +16,7 @@ async function cargar() {
   const { data, error } = await supabase
     .from('tareas')
     .select(`
-      id, titulo, estado, fecha_limite, progreso,
+      id, titulo, estado, fecha_limite, progreso, responsable_cargo_id, supervisor_cargo_id,
       actividad:actividades(codigo, nombre),
       responsable:cargos!tareas_responsable_cargo_id_fkey(nombre, persona:personas!cargos_persona_id_fkey(nombre, apellido))
     `)
@@ -74,6 +75,20 @@ export async function aprobar(tarea, alTerminar) {
   await (alTerminar || recargar)();
 }
 
+// Bloque C — activa estado_tarea.no_aplica (existe desde 0001, autoridad ya
+// construida en fn_transicion_estado_tarea desde 0004, ningún botón lo
+// disparaba hasta ahora). Sin modal: no existe columna de motivo para esta
+// transición en la base, y no se inventa una.
+export async function marcarNoAplica(tarea, alTerminar) {
+  const { error } = await supabase.from('tareas').update({ estado: 'no_aplica' }).eq('id', tarea.id);
+  if (error) {
+    mostrarAviso(mensajeError(error), 'error');
+    return;
+  }
+  mostrarAviso('Tarea marcada como no aplica.', 'exito');
+  await (alTerminar || recargar)();
+}
+
 function columnasBandeja() {
   return [
     {
@@ -105,13 +120,14 @@ function columnasBandeja() {
 }
 
 function adjuntarAcciones(tabla, lista) {
+  const { sesion } = getEstado();
   tabla.querySelectorAll('tbody tr').forEach((tr, i) => {
     const tarea = lista[i];
     if (!tarea) return;
     const td = tr.querySelector('td:last-child');
     td.className = 'tabla__acciones';
 
-    if (tarea.estado === 'en_revision') {
+    if (tarea.estado === 'en_revision' && puedeAprobarODevolver(sesion, tarea)) {
       const aprobarBtn = document.createElement('button');
       aprobarBtn.type = 'button';
       aprobarBtn.className = 'boton boton--primario boton--pequeno';
@@ -133,6 +149,15 @@ function adjuntarAcciones(tabla, lista) {
       verBtn.textContent = 'Ver';
       verBtn.addEventListener('click', () => { location.href = `/tarea.html?id=${tarea.id}`; });
       td.appendChild(verBtn);
+    }
+
+    if (puedeMarcarNoAplica(sesion, tarea)) {
+      const noAplicaBtn = document.createElement('button');
+      noAplicaBtn.type = 'button';
+      noAplicaBtn.className = 'boton boton--fantasma boton--pequeno';
+      noAplicaBtn.textContent = 'No aplica';
+      noAplicaBtn.addEventListener('click', () => marcarNoAplica(tarea, recargar));
+      td.appendChild(noAplicaBtn);
     }
   });
 }

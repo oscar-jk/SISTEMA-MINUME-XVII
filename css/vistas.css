@@ -582,6 +582,11 @@
 .checklist-filtros { margin-bottom: 1rem; }
 .campo-buscar { width: 100%; margin-bottom: 0.75rem; }
 
+/* Bloque C — fila de selects del filtro de rama en cascada, calcada de
+   .calendario-filtros (el único precedente de fila de <select> de filtro). */
+.checklist-filtro-rama { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+.checklist-filtro-rama select { min-height: 38px; font-size: var(--texto-xs); }
+
 .checklist-grupo { margin-bottom: 2rem; }
 .checklist-grupo__cabecera {
   display: flex;

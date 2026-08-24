@@ -9,7 +9,7 @@ import {
   ESTADO_TAREA_LABEL, PRIORIDAD_LABEL, nombreCompleto, escapeHtml,
 } from '../utils/formato.js';
 import {
-  puedeRegistrarAvance, puedeEnviarRevision, puedeAprobarODevolver, puedeTomarTarea,
+  puedeRegistrarAvance, puedeEnviarRevision, puedeAprobarODevolver, puedeTomarTarea, puedeMarcarNoAplica,
 } from '../core/permisos.js';
 import { montarEvidencia } from './evidencia-widget.js';
 import { esqueletoTexto } from '../ui/esqueleto.js';
@@ -146,6 +146,16 @@ async function enviarARevision(tarea, alTerminar) {
   alTerminar();
 }
 
+async function marcarNoAplica(tarea, alTerminar) {
+  const { error } = await supabase.from('tareas').update({ estado: 'no_aplica' }).eq('id', tarea.id);
+  if (error) {
+    mostrarAviso(mensajeError(error), 'error');
+    return;
+  }
+  mostrarAviso('Tarea marcada como no aplica.', 'exito');
+  alTerminar();
+}
+
 function filaAvance(avance) {
   return `
     <li class="avance">
@@ -276,6 +286,14 @@ async function pintar() {
     devolverBtn.textContent = 'Devolver';
     devolverBtn.addEventListener('click', () => abrirHojaDevolucion(tarea, refrescar));
     acciones.appendChild(devolverBtn);
+  }
+
+  if (puedeMarcarNoAplica(sesion, tarea)) {
+    const noAplicaBtn = document.createElement('button');
+    noAplicaBtn.className = 'boton boton--fantasma';
+    noAplicaBtn.textContent = 'No aplica';
+    noAplicaBtn.addEventListener('click', () => marcarNoAplica(tarea, refrescar));
+    acciones.appendChild(noAplicaBtn);
   }
 }
 

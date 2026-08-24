@@ -227,6 +227,18 @@ frontend — `js/core/permisos.js` solo oculta botones. El detalle está en
   esta migración, no datos de prueba: las dos filas sembradas en `0016`
   ('Operaciones'/'Academica') nunca recibieron su `subsecretaria_id` al
   normalizar en `0030`/`0032`, quedando indistinguibles de la fila default.
+- `0039`-`0041` — Bloque C: `actividades.subsecretaria_id`/`comision_id`
+  (a lo sumo una, ambas `null` legal), activa `estado_tarea.no_aplica`
+  (dormida desde `0001`) y arregla `calendario.js` para que escriba
+  `actividades.fase_id` — ver "Checklist condicional y filtros en cascada"
+  abajo. `0040` abre `subsecretarias_select` a `using(true)` (igual que
+  `comisiones_select` desde `0030`): encontrado implementando 0039, el
+  picker de rama del formulario de nueva actividad debe funcionar para
+  cualquier `puede_asignar()` (coordinador incluido), pero la RLS restringía
+  la lectura a `es_gestor_de_rama()` o la subsecretaría propia. `0041` añade
+  los índices de `actividades.subsecretaria_id`/`comision_id` que `0039`
+  omitió — mismo patrón que `cargos` (`0030`) y `grupos_trabajo` (`0033`)
+  ya tenían para estas columnas.
 
 Las únicas piezas que tocan la clave de servicio de Supabase son las
 Edge Functions (`crear-cuenta`, `restablecer-contrasena`,
@@ -589,6 +601,81 @@ lógica de precedencia en el cliente. La columna "Puntualidad" pasó de texto pl
 insignia de color (`.estado--puntual`/`.estado--tarde`, mismo patrón que
 `.estado--completada`/`.estado--rechazada`), y la tabla de aprobación del supervisor —que
 antes no mostraba puntualidad en absoluto— ahora también la muestra.
+
+## Checklist condicional y filtros en cascada (Bloque C)
+
+Bloque C de la especificación funcional no tenía un precedente exacto en el código — se
+resolvió en dos piezas reales que se componen en una sola historia (`0039`-`0041`):
+
+1. **`actividades.subsecretaria_id`/`comision_id`** — mismo molde que `tolerancias_puntualidad`
+   (`0030`): a lo sumo una de las dos, ambas `null` es legal y es el caso frecuente ("actividad
+   general del evento"), a diferencia de `grupos_trabajo` (`0033`), que exige exactamente una.
+   Sin cambios de RLS (`actividades_select` sigue `using(true)`) — es una etiqueta de
+   categorización para el checklist, no un mecanismo de visibilidad. Sin trigger de autoridad
+   nuevo: `puede_asignar()` (coordinador incluido) ya podía insertar/editar cualquier actividad
+   del evento sin acotamiento por rama; estas columnas solo la clasifican.
+2. **Activa `estado_tarea.no_aplica`** — existe desde `0001`, con su regla de autoridad ya
+   construida en `fn_transicion_estado_tarea` (`0004`: la misma cadena de supervisión que
+   `completada`) desde entonces, pero ningún botón en toda la app la disparaba. `permisos.js`
+   gana `puedeMarcarNoAplica()` (reutiliza `puedeAprobarODevolver` tal cual, añade solo ocultar
+   el botón en un estado ya terminal); `bandeja.js` gana `marcarNoAplica()` sin modal (no existe
+   columna de motivo para esta transición y no se inventa una); `tarea.js` gana su propia copia
+   local (sigue el patrón ya establecido en ese archivo, que duplica en vez de importar de
+   `bandeja.js`); `checklist.js` reexporta ambas. `contarCompletadas()` del checklist ahora
+   cuenta `no_aplica` junto con `completada` — un ítem no aplicable no es "todavía pendiente".
+
+**Encontrado revisando `bandeja.js` para añadir el botón, corregido en el mismo paso**: la
+bandeja de aprobación real del supervisor no importaba nada de `permisos.js` — sus botones
+Aprobar/Devolver se mostraban sin ninguna condición de autoridad en el cliente (el backend sí
+los rechazaba, la UI no lo reflejaba), a diferencia de `tarea.js`/`checklist.js`, que sí los
+gatean con `puedeAprobarODevolver`. Ya que hacía falta importar `permisos.js` para el botón
+nuevo, se alinearon también los botones existentes con el mismo gate — fuga cosmética, no de
+seguridad: la base ya rechazaba correctamente (confirmado: un coordinador ve el botón por la
+heurística amplia del cliente, pero un intento real de aprobar una tarea fuera de su cadena de
+supervisión devuelve 403 desde `fn_transicion_estado_tarea`). Su `select()` también ganó
+`responsable_cargo_id`/`supervisor_cargo_id` — sin esas columnas el nuevo gate no tenía con qué
+evaluar la condición.
+
+**`checklist.js` — filtro división→rama en cascada**: mismo patrón que `actualizarCatalogo()`
+en `grupos-trabajo.js` (picker de división que repuebla un segundo `<select>` de
+subsecretaría/comisión), adaptado a re-pintar la lista en vez de mostrar/ocultar un campo de
+formulario, con el mismo truco `sub:<id>`/`com:<id>` de codificación de un único filtro. Nueva
+`resolverRama(t)`: como `tareas` no tiene columna de rama propia, resuelve por el primer valor
+no nulo entre la rama de su `actividad` y la de su `grupo_trabajo` destinatario — **gana el
+primer no nulo, no "gana actividad porque existe `actividad_id`"**: una actividad general del
+evento (ambas ramas `null`) no debe tapar una rama real que sí venga del grupo de trabajo.
+
+**Encontrado implementando el picker de rama en `calendario.js`, no en el diseño**: la RLS de
+`subsecretarias_select` (desde el Bloque 0) restringía la lectura a `es_gestor_de_rama()`
+(sg/sga/sgl/subsecretario/super_admin) o la subsecretaría propia — pero `puede_asignar()`, que
+gatea "Nueva actividad", también incluye `coordinador`. Un coordinador podía abrir el
+formulario pero la mitad SG/SGL del picker quedaba vacía en silencio (RLS filtra filas sin
+error; `comisiones_select` ya era `using(true)` desde `0030`, por eso SGA sí funcionaba).
+Verificado empíricamente en el navegador antes de decidir. `0040` abre `subsecretarias_select`
+al mismo `using(true)` que `comisiones` — ninguna de las dos tablas es sensible, son solo
+nombres de rama.
+
+**`calendario.js` — arregla el formulario de creación de actividades**: `abrirFormularioActividad()`
+pasa a `async` y gana un `<select name="fase_id">` poblado desde `fases_actividad` en vez del
+`<input name="fase">` de texto libre que tenía desde el principio — escribiendo en el mismo
+insert el `nombre` de la fase elegida en la columna heredada `fase`, para que el filtro de fase
+de este mismo módulo (que sigue leyendo esa columna de texto) no necesite tocarse. Antes de este
+bloque, **toda actividad creada desde la app en vivo caía para siempre en "Sin fase / general"**
+en `checklist.js`, porque nunca se escribía `fase_id` — la columna estructurada que el checklist
+usa para agrupar desde `0011`. Gana también el mismo picker división→subsecretaría/comisión que
+`grupos-trabajo.js` ya usaba, fijando `subsecretaria_id`/`comision_id`.
+
+Nota pre-existente, no una regresión de este bloque: las actividades ya sembradas antes de
+`0039` tienen `fase` en minúscula sin acentos (`'preparacion'`, etc.), que nunca va a coincidir
+con el `nombre` con mayúscula que el formulario escribe de ahora en adelante (`'Pre-evento'`) —
+el filtro de fase de `calendario.js` (que sigue leyendo esa columna de texto) mostrará ambas
+formas como chips separados para actividades viejas vs. nuevas.
+
+**Verificado sin repetir el bug de ambigüedad de PostgREST del Bloque B** (`personas.creada_por`
+creó una segunda relación `cargos`↔`personas` y rompió 15 archivos): no existía ningún camino
+entre `actividades` y `subsecretarias`/`comisiones`, ni entre `tareas` y `grupos_trabajo` más
+allá de `tareas.grupo_trabajo_id` — confirmado por consulta directa a `pg_constraint` antes y
+después de aplicar `0039`. Ningún embed nuevo necesitó hint de constraint.
 
 ## Actualizar `supabase-js`
 

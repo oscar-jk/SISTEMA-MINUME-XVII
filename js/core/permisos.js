@@ -37,6 +37,17 @@ export function puedeEnviarRevision(sesion, tarea) {
   return esResponsableDe(sesion, tarea) && tarea.estado === 'en_curso';
 }
 
+// Bloque C — activa no_aplica/cancelada. La condición de identidad en
+// fn_transicion_estado_tarea para estas transiciones es idéntica a la de
+// completada (misma cadena de supervisión), así que reutiliza
+// puedeAprobarODevolver tal cual; solo añade la restricción de estado (el
+// backend no la exige, pero mostrar el botón en una tarea ya terminal no
+// tendría sentido).
+export function puedeMarcarNoAplica(sesion, tarea) {
+  return puedeAprobarODevolver(sesion, tarea)
+    && !['completada', 'cancelada', 'no_aplica'].includes(tarea.estado);
+}
+
 export function esAdmin(sesion) {
   return !!sesion && sesion.esSuperAdmin;
 }

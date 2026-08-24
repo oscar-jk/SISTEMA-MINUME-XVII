@@ -19,6 +19,21 @@ let actividades = [];
 let conteos = new Map(); // actividad_id -> { total, completadas }
 let filtros = { fase: '', area: '', estado: '', prioridad: '' };
 
+const DIVISIONES = [{ v: 'sg', t: 'SG' }, { v: 'sga', t: 'SGA' }, { v: 'sgl', t: 'SGL' }];
+
+async function cargarFasesActividad() {
+  const { data } = await supabase.from('fases_actividad').select('id, codigo, nombre, orden').order('orden');
+  return data || [];
+}
+async function cargarSubsecretarias() {
+  const { data } = await supabase.from('subsecretarias').select('id, nombre, division').order('nombre');
+  return data || [];
+}
+async function cargarComisiones() {
+  const { data } = await supabase.from('comisiones').select('id, nombre').order('nombre');
+  return data || [];
+}
+
 function esMovil() {
   return window.matchMedia('(max-width: 767px)').matches;
 }
@@ -195,7 +210,20 @@ function moverCursor(delta) {
   cargarYPintar();
 }
 
-function abrirFormularioActividad() {
+// Bloque C — antes solo escribía la columna de texto libre `fase`, nunca
+// `fase_id` (la estructurada que checklist.js usa para agrupar desde que
+// existe): toda actividad creada desde la app en vivo caía para siempre en
+// "Sin fase / general" ahí. Ahora escribe ambas: `fase_id` de verdad, y el
+// `nombre` de la fase elegida en la columna heredada `fase`, para que el
+// filtro de fase de este mismo módulo (que todavía lee esa columna de
+// texto) siga funcionando sin tocar su lógica. Gana también el picker
+// división→subsecretaría/comisión (mismo patrón que grupos-trabajo.js) para
+// fijar subsecretaria_id/comision_id.
+async function abrirFormularioActividad() {
+  const [fasesActividad, subsecretarias, comisiones] = await Promise.all([
+    cargarFasesActividad(), cargarSubsecretarias(), cargarComisiones(),
+  ]);
+
   const div = document.createElement('div');
   div.innerHTML = `
     <form class="formulario" data-form>
@@ -210,8 +238,17 @@ function abrirFormularioActividad() {
         <label class="campo"><span>Hora fin</span><input name="hora_fin" type="time" /></label>
       </div>
       <div class="formulario__fila">
-        <label class="campo"><span>Fase</span><input name="fase" placeholder="preparación / ejecución / cierre" /></label>
+        <label class="campo"><span>Fase</span><select name="fase_id">${opcionesSelect(fasesActividad, { valor: 'id', etiqueta: 'nombre', vacio: 'Sin fase' })}</select></label>
         <label class="campo"><span>Área responsable</span><input name="area_responsable" /></label>
+      </div>
+      <div class="formulario__fila">
+        <label class="campo"><span>División</span><select name="division" data-division>${opcionesSelect(DIVISIONES, { valor: 'v', etiqueta: 't', vacio: 'Actividad general del evento' })}</select></label>
+      </div>
+      <div class="formulario__fila" data-catalogo-subsecretaria hidden>
+        <label class="campo"><span>Subsecretaría</span><select name="subsecretaria_id"></select></label>
+      </div>
+      <div class="formulario__fila" data-catalogo-comision hidden>
+        <label class="campo"><span>Comisión</span><select name="comision_id">${opcionesSelect(comisiones, { valor: 'id', etiqueta: 'nombre', vacio: 'Sin comisión' })}</select></label>
       </div>
       <div class="formulario__fila">
         <label class="campo"><span>Dotación requerida</span><input name="dotacion_requerida" type="number" min="0" value="0" /></label>
@@ -222,12 +259,38 @@ function abrirFormularioActividad() {
   `;
   const { cerrar } = abrirModal({ titulo: 'Nueva actividad', contenido: div });
 
+  const selectDivision = div.querySelector('[data-division]');
+  const bloqueSubsecretaria = div.querySelector('[data-catalogo-subsecretaria]');
+  const bloqueComision = div.querySelector('[data-catalogo-comision]');
+  const selectSubsecretariaId = div.querySelector('[name="subsecretaria_id"]');
+  const selectComisionId = div.querySelector('[name="comision_id"]');
+
+  function actualizarCatalogo() {
+    const division = selectDivision.value;
+    bloqueSubsecretaria.hidden = division !== 'sg' && division !== 'sgl';
+    bloqueComision.hidden = division !== 'sga';
+    if (bloqueComision.hidden) selectComisionId.value = '';
+    if (bloqueSubsecretaria.hidden) {
+      selectSubsecretariaId.innerHTML = '';
+    } else {
+      selectSubsecretariaId.innerHTML = opcionesSelect(
+        subsecretarias.filter((s) => s.division === division),
+        { valor: 'id', etiqueta: 'nombre', vacio: 'Sin subsecretaría' },
+      );
+    }
+  }
+  selectDivision.addEventListener('change', actualizarCatalogo);
+  actualizarCatalogo();
+
   div.querySelector('[data-form]').addEventListener('submit', async (e) => {
     e.preventDefault();
     const { sesion } = getEstado();
     const datos = datosFormulario(e.target);
     datos.dotacion_requerida = Number(datos.dotacion_requerida || 0);
     datos.creada_por = sesion.cargo.id;
+    delete datos.division;
+    const fase = fasesActividad.find((f) => f.id === datos.fase_id);
+    datos.fase = fase ? fase.nombre : null;
     const { error } = await supabase.from('actividades').insert(datos);
     if (error) {
       mostrarAviso(mensajeError(error), 'error');
