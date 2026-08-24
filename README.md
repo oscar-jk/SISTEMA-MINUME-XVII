@@ -246,6 +246,9 @@ frontend — `js/core/permisos.js` solo oculta botones. El detalle está en
 - `0043`-`0044` — Bloque F: activa `criterios_evaluacion`/`evaluaciones`/
   `es_evaluador_de()` (dormidas desde `0001`/`0008`) — nueva página
   `evaluaciones.html` — ver "Evaluación por cortes" abajo.
+- `0045` — Bloque H: `espacios_select_publico` abre `espacios` a `anon`
+  (mismo molde que `regionales_lectura_publica`, `0029`) — nueva página
+  `croquis-publico.html` — ver "Croquis público" abajo.
 
 Las únicas piezas que tocan la clave de servicio de Supabase son las
 Edge Functions (`crear-cuenta`, `restablecer-contrasena`,
@@ -852,6 +855,45 @@ exportación" (ese sigue fuera de alcance).
 exacta de la sección de cortes que ya existía ahí — sin esto la tabla de rúbrica seguía sin
 ninguna fila que un evaluador pudiera calificar.
 
+## Croquis público (Bloque H)
+
+A diferencia de todo bloque anterior, aquí no había ninguna pieza dormida que activar — dos
+piezas ya funcionando solo hacía falta recombinar:
+
+1. **`montarPlano(el, {espacios, editable})`** (`js/modules/plano-editor.js`) ya es una función de
+   render pura, sin ninguna consulta a Supabase propia salvo el `update` de guardar posición, que
+   solo existe bajo `editable: true`. Con `editable: false` — ya usado hoy por `espacios.js` para
+   quien no `puede_asignar()` — el camino de solo lectura ya era 100% funcional: sin el toggle
+   Ver/Editar, las salas se dibujan como `<div>` (no `<button>`) pero siguen siendo clicables y
+   muestran nombre/capacidad/piso en el panel lateral. Cero cambios de lógica hicieron falta ahí
+   — solo una corrección de copy (el texto del panel vacío decía "ver o editar" incluso cuando
+   editar nunca es posible; ahora es condicional a `editable`).
+2. **El patrón de página pública** ya probado por `registro.html`/`registro.js` — la única página
+   que se salta `montarShell()` por completo — y `regionales_lectura_publica` (`0029`), el único
+   precedente de una tabla abierta a `anon` antes de login, aditivo a la política de
+   `authenticated` que ya existía.
+
+`0045` agrega exactamente eso: `espacios_select_publico`, aditiva a `espacios_select` (`0003`,
+que sigue intacta), sin tocar `espacios_escritura` (sigue exigiendo `puede_asignar()` — un
+visitante público nunca puede escribir). `tipos_espacio`/`estados_espacio` no ganan política
+nueva: `plano-editor.js` no usa esas columnas en ningún lado, así que el fetch público las omite
+del todo — no hace falta exponerlas a `anon` para nada que el croquis realmente muestre.
+
+**Nueva página `croquis-publico.html`**, trio calcado de `registro.html`/`registro.js` (mismo
+shell mínimo, mismas clases `.pantalla-registro*` de `vistas.css`, `<meta name="robots"
+content="noindex">`, sin sidebar). Mismo patrón de filtro por piso que `pintarPlano()` ya tenía
+en `espacios.js`, con un fetch propio más angosto (sin `tipo`/`estado`). `espacios.js` gana un
+enlace de salida simple hacia esta página en su pestaña "Plano" — sin esto la página pública
+quedaba huérfana, sin ninguna forma de que un miembro del staff la encontrara o la compartiera.
+
+**Deliberadamente fuera de este bloque**: el croquis público muestra solo la estructura
+(nombre/posición/capacidad/piso), no el estado "en vivo" — confirmado que "Plano" y "En vivo" son
+hoy dos renderizados completamente separados en `espacios.js`, sin ningún cruce de datos entre
+ellos. El nombre del bloque y la frase original del README apuntaban a "el plano", no a la
+actividad en tiempo real; superponer el estado en vivo sobre las cajas del plano sería trabajo
+nuevo no descrito, y además reabriría la pregunta de presupuesto de Realtime del Bloque D para un
+público sin límite de conexiones conocido (cualquiera con el enlace, no solo staff).
+
 ## Acreditación de delegados (SIRIO-ACR)
 
 `registro.html` es la única página pública de todo el sistema — sin
@@ -904,8 +946,7 @@ cargos reales de cada comisión/subsecretaría (el catálogo de las 15
 comisiones y las 3+5 subsecretarías ya existe — ver "Subsecretarías y
 comisiones" — pero los cargos concretos de cada una todavía no se cargan;
 eso depende del panel de desarrollador y grupos de trabajo), consolidados
-en tiempo real, reportes y exportación, croquis público (vista de solo
-lectura del plano sin sesión — el croquis en vivo actual sí exige login), planificación
+en tiempo real, reportes y exportación, planificación
 estratégica, hospedaje detallado más allá de lo que ya captura
 acreditación (número de habitación/compañero/líder de edificio), y
 auditoría completa (esta ronda solo tiene la bitácora mínima). También

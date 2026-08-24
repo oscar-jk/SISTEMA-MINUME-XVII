@@ -160,6 +160,9 @@ async function pintarPlano(el, espacios) {
       <button type="button" class="chip${pisoActivo === '' ? ' chip--activo' : ''}" data-piso="">Todos los pisos</button>
       ${pisos.map((p) => `<button type="button" class="chip${pisoActivo === p ? ' chip--activo' : ''}" data-piso="${escapeHtml(p)}">Piso ${escapeHtml(p)}</button>`).join('')}
     </div>
+    <p class="texto-mudo texto-pequeno">
+      <a href="/croquis-publico.html" target="_blank" rel="noopener">Ver croquis público — sin sesión, para compartir</a>
+    </p>
     <div data-lienzo-envoltorio></div>
   `;
   el.querySelector('[data-pisos]').addEventListener('click', (e) => {

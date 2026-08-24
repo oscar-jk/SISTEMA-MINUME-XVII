@@ -48,7 +48,7 @@ export function montarPlano(el, { espacios, editable }) {
   function pintarPanel() {
     const panel = el.querySelector('[data-panel]');
     if (!seleccionado) {
-      panel.innerHTML = '<p class="texto-mudo texto-pequeno">Toca un espacio del plano para ver o editar sus datos.</p>';
+      panel.innerHTML = `<p class="texto-mudo texto-pequeno">Toca un espacio del plano para ver${editable ? ' o editar' : ''} sus datos.</p>`;
       return;
     }
     panel.innerHTML = `
