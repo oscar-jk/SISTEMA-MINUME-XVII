@@ -239,6 +239,10 @@ frontend — `js/core/permisos.js` solo oculta botones. El detalle está en
   los índices de `actividades.subsecretaria_id`/`comision_id` que `0039`
   omitió — mismo patrón que `cargos` (`0030`) y `grupos_trabajo` (`0033`)
   ya tenían para estas columnas.
+- `0042` — Bloque D: `alter publication supabase_realtime add table
+  actividades` — activa Realtime para la pestaña "En vivo" de
+  `espacios.html`, primera tabla en usar Realtime en todo el proyecto —
+  ver "Realtime para En vivo" abajo.
 
 Las únicas piezas que tocan la clave de servicio de Supabase son las
 Edge Functions (`crear-cuenta`, `restablecer-contrasena`,
@@ -731,11 +735,63 @@ enlaces `mailto:`/`tel:`. El croquis en vivo también se sumó: pestaña
 "En vivo" en `espacios.html`, calcula el estado de cada salón (en
 sesión / próxima sesión / sesiones terminadas / libre) al vuelo contra
 `actividades.hora_inicio/hora_fin` de hoy, sin campo de estado propio
-que mantener sincronizado — se refresca solo cada 30s (`setInterval`,
-limpiado al cambiar de pestaña o salir de la página). Decisión
-explícita: refresco por sondeo, no Realtime — evita el presupuesto de
-conexiones/mensajes que Realtime exige calcular por escrito antes de
-implementarse (Bloque D, aún pendiente).
+que mantener sincronizado. Desde el Bloque D usa Realtime en vez de
+sondeo — ver "Realtime para En vivo" abajo.
+
+## Realtime para En vivo (Bloque D)
+
+Bloque D no tenía ambigüedad de alcance: el propio README ya lo definía en una frase, en la
+sección "Croquis en vivo" de arriba — sondeo por decisión explícita, "hasta calcular por escrito
+el presupuesto de conexiones/mensajes". Búsqueda exhaustiva confirmó que la pestaña "En vivo" de
+`espacios.html` es el **único** lugar de sondeo en todo el proyecto — ningún otro módulo se
+refresca por temporizador, todos lo hacen por acción del usuario o por eventos locales del propio
+tab. Bloque D es exactamente esto: ese único sondeo, convertido a Realtime.
+
+**Dos causas de cambio, no una** — separadas en vez de colapsadas en un solo mecanismo:
+
+1. **Alguien escribió en `actividades`** (crear/editar/borrar, o `fn_refechar_rango` re-fechando
+   en bloque) — esto es lo que Realtime reemplaza. `espacios.js` se suscribe a
+   `postgres_changes` sobre `actividades` (`event: '*'`, sin filtro de fecha) y, ante cualquier
+   evento, vuelve a pedir `fetchActividadesHoy()` con un *debounce* de 400ms — necesario porque
+   la replicación lógica de Postgres entrega un evento **por fila afectada**, no uno por
+   sentencia: re-fechar 40 actividades con `fn_refechar_rango` dispara 40 eventos casi
+   simultáneos, y el debounce los colapsa en un solo refetch.
+2. **El reloj avanzó** y cruzó una `hora_inicio`/`hora_fin` — esto no produce ninguna escritura en
+   la base, así que Realtime nunca lo va a avisar por sí solo. El `setInterval` de 30s se queda,
+   pero cambia de trabajo: ya no vuelve a consultar la base (era su único costo antes), solo
+   recalcula `calcularEstadoEnVivo()` contra el array de actividades ya cacheado en memoria —
+   mismo cálculo de siempre, cero red.
+
+**Sin filtro de fecha en la suscripción, a propósito**: un `filter: 'fecha=eq.<hoy>'` queda fijo
+al string calculado en el momento de suscribirse — si alguien deja la pestaña "En vivo" abierta
+cruzando medianoche (evento de varios días), el canal quedaría mudo para "hoy" en silencio, sin
+error visible, hasta recargar la página. `fetchActividadesHoy()` ya filtra por fecha en cada
+refetch, así que la corrección no depende del filtro del canal — y el costo de no filtrar es
+despreciable (ver presupuesto abajo).
+
+**Al recibir un evento, refetch completo, no un parche del array a mano**: reutiliza la misma
+`refrescarDatos()` que ya llama el timer al montar la pestaña. El estado de un espacio depende de
+*todas* las filas de `actividades`, no solo de la que cambió — reconstruir el merge de
+insert/update/delete a mano en una tabla pequeña con escrituras raras sería puro riesgo sin
+beneficio medible.
+
+**Ciclo de vida del canal**: se limpia (`supabase.removeChannel`) en los mismos dos lugares donde
+ya se limpiaba el `setInterval` — al cambiar de pestaña dentro de `espacios.html`
+(`pintarPestana()`) y al salir de la página (`destroy()`) — con la misma guarda que ya usaba el
+timer, así que reentrar varias veces a "En vivo" en una misma visita nunca apila canales.
+
+**Sin canales privados ni políticas de `realtime.messages`**: `actividades_select` ya es
+`using(true)` desde siempre, y Postgres Changes respeta la RLS de la tabla automáticamente
+(confirmado en la documentación de Supabase) — el canal clásico alcanza.
+
+**Presupuesto de conexiones/mensajes** (proyecto `pnwodmktafqtijjtvihj`, plan **Free** confirmado:
+200 conexiones pico concurrentes/mes, 2,000,000 mensajes/mes, sin cargo por exceso en Free).
+Conexiones = pestañas de navegador con "En vivo" abierta a la vez — aun con 50 personas viendo
+simultáneamente esa única sub-pestaña de monitoreo (cota generosa), son 25% de la cuota. Mensajes
+= escrituras fila-por-fila en `actividades` × suscriptores concurrentes en ese instante — con una
+estimación generosa de 500 eventos de fila en todo el período operativo del evento × 50
+suscriptores concurrentes, 25,000 mensajes: 1.25% de la cuota mensual. Margen amplio en ambos
+casos, primera tabla en usar Realtime en el proyecto (`0042`).
 
 ## Acreditación de delegados (SIRIO-ACR)
 
@@ -798,6 +854,6 @@ acreditación (número de habitación/compañero/líder de edificio), y
 auditoría completa (esta ronda solo tiene la bitácora mínima). También
 quedan pendientes de una ronda dedicada: paginación general de listas
 largas, densificación de
-`mis-tareas`/`bandeja` a tablas con filtros persistentes en la URL,
-Realtime, PWA, notificaciones internas, y una auditoría de accesibilidad
-completa (foco de modal, ARIA, `prefers-reduced-motion`).
+`mis-tareas`/`bandeja` a tablas con filtros persistentes en la URL, PWA,
+notificaciones internas, y una auditoría de accesibilidad completa (foco
+de modal, ARIA, `prefers-reduced-motion`).

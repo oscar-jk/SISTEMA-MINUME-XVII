@@ -16,6 +16,8 @@ let contenedor = null;
 let pestanaActiva = 'plano';
 let pisoActivo = '';
 let intervaloEnVivo = null;
+let canalEnVivo = null;
+let debounceEnVivo = null;
 
 async function fetchEspacios() {
   const { data, error } = await supabase
@@ -51,8 +53,9 @@ async function fetchAsignaciones(fecha) {
 // "En vivo" no guarda un estado propio del espacio: lo calcula al vuelo
 // contra las actividades de hoy que apuntan a ese espacio_id, comparando
 // la hora local del navegador (no una franja server-side — es solo para
-// mostrar "ahora mismo", se refresca solo cada 30s con la fecha/hora que
-// venga de la propia consulta a actividades.hora_inicio/hora_fin).
+// mostrar "ahora mismo"). Se vuelve a pedir cuando Realtime avisa que
+// `actividades` cambió (Bloque D, 0042), y cada 30s como respaldo del
+// reloj — ver comentario en pintarEnVivo().
 async function fetchActividadesHoy() {
   const { data, error } = await supabase
     .from('actividades')
@@ -95,8 +98,12 @@ async function pintarEnVivo(el, espacios) {
     <div data-tabla-envivo></div>
   `;
 
-  async function actualizar() {
-    const [actividadesHoy] = await Promise.all([fetchActividadesHoy()]);
+  // Dos causas de cambio, dos costos distintos: repintar() solo recalcula
+  // contra lo ya cacheado (el reloj avanzó, sin red); refrescarDatos()
+  // vuelve a pedir la base (algo escribió en actividades, vía Realtime).
+  let actividadesHoy = [];
+
+  function repintar() {
     const ahora = horaActualLocal();
     const vivos = espacios.map((e) => ({ ...e, vivo: calcularEstadoEnVivo(e, actividadesHoy, ahora) }));
 
@@ -117,12 +124,33 @@ async function pintarEnVivo(el, espacios) {
     const contTabla = el.querySelector('[data-tabla-envivo]');
     if (contTabla) contTabla.replaceChildren(tabla);
     const marcaTiempo = el.querySelector('[data-actualizado]');
-    if (marcaTiempo) marcaTiempo.textContent = `Actualizado ${new Date().toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' })} · se refresca solo cada 30s`;
+    if (marcaTiempo) marcaTiempo.textContent = `Actualizado ${new Date().toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' })} · cambios en vivo, reloj revisado cada 30s`;
   }
 
-  await actualizar();
+  async function refrescarDatos() {
+    actividadesHoy = await fetchActividadesHoy();
+    repintar();
+  }
+
+  await refrescarDatos();
   if (intervaloEnVivo) clearInterval(intervaloEnVivo);
-  intervaloEnVivo = setInterval(actualizar, 30000);
+  intervaloEnVivo = setInterval(repintar, 30000);
+
+  // Realtime cubre "cambió una actividad" (escritura, rara); el setInterval
+  // de arriba cubre "el reloj cruzó una hora de inicio/fin" (sin red,
+  // recompute local contra lo ya cacheado). Sin filtro de fecha a
+  // propósito: un canal fijado a fecha=eq.<hoy de apertura> quedaría mudo
+  // tras medianoche si la pestaña sigue abierta en un evento de varios
+  // días; el costo de no filtrar es despreciable (ver presupuesto en
+  // README, Bloque D).
+  if (canalEnVivo) { supabase.removeChannel(canalEnVivo); canalEnVivo = null; }
+  canalEnVivo = supabase
+    .channel('en-vivo-actividades')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'actividades' }, () => {
+      clearTimeout(debounceEnVivo);
+      debounceEnVivo = setTimeout(refrescarDatos, 400);
+    })
+    .subscribe();
 }
 
 async function pintarPlano(el, espacios) {
@@ -235,6 +263,11 @@ async function pintarPestana() {
     clearInterval(intervaloEnVivo);
     intervaloEnVivo = null;
   }
+  if (pestanaActiva !== 'envivo' && canalEnVivo) {
+    supabase.removeChannel(canalEnVivo);
+    canalEnVivo = null;
+    clearTimeout(debounceEnVivo);
+  }
   const cuerpo = contenedor.querySelector('[data-cuerpo]');
   cuerpo.innerHTML = esqueletoTabla();
   const espacios = await fetchEspacios();
@@ -267,5 +300,8 @@ export async function render(el) {
 export function destroy() {
   if (intervaloEnVivo) clearInterval(intervaloEnVivo);
   intervaloEnVivo = null;
+  if (canalEnVivo) supabase.removeChannel(canalEnVivo);
+  canalEnVivo = null;
+  clearTimeout(debounceEnVivo);
   contenedor = null;
 }
