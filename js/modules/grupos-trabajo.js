@@ -12,9 +12,9 @@ import { datosFormulario, opcionesSelect } from '../ui/formulario.js';
 import { crearTabla } from '../ui/tabla.js';
 import { esqueletoTabla } from '../ui/esqueleto.js';
 import { abrirModal } from '../ui/modal.js';
-import { formatoHora } from '../utils/fechas.js';
-import { nombreCompleto } from '../utils/formato.js';
-import { puedeGestionarRamas } from '../core/permisos.js';
+import { formatoHora, etiquetaPlazo } from '../utils/fechas.js';
+import { nombreCompleto, ESTADO_TAREA_LABEL, PRIORIDAD_LABEL } from '../utils/formato.js';
+import { puedeGestionarRamas, puedeGestionarEsteGrupo } from '../core/permisos.js';
 
 let contenedor = null;
 
@@ -51,6 +51,14 @@ async function fetchMiembros(grupoId) {
     .select('id, nombre, persona:personas(nombre, apellido)')
     .eq('grupo_trabajo_id', grupoId)
     .order('nombre');
+  return data || [];
+}
+async function fetchTareasGrupo(grupoId) {
+  const { data } = await supabase
+    .from('tareas')
+    .select('id, titulo, estado, prioridad, fecha_limite, responsable_cargo_id, responsable:cargos!tareas_responsable_cargo_id_fkey(nombre, persona:personas(nombre, apellido))')
+    .eq('grupo_trabajo_id', grupoId)
+    .order('fecha_limite', { ascending: true, nullsFirst: false });
   return data || [];
 }
 async function fetchCandidatos(grupo) {
@@ -120,6 +128,82 @@ function abrirModalMiembros(grupo, alCerrar) {
     if (error) { mostrarAviso(mensajeError(error), 'error'); return; }
     await refrescar();
   });
+
+  refrescar();
+  return { cerrar };
+}
+
+// Bloque A — tareas dirigidas a este grupo. Lectura abierta a quien vea la
+// fila (igual que "Miembros"); crear una tarea nueva exige la misma
+// autoridad que ya gobierna este grupo (puedeGestionarEsteGrupo — espejo
+// de la rama nueva de tareas_insert en 0035), no puedeAsignar(): un
+// coordinador no puede dirigir trabajo al grupo completo.
+function abrirModalTareas(grupo) {
+  const { sesion } = getEstado();
+  const puedeCrear = puedeGestionarEsteGrupo(sesion, grupo);
+  const div = document.createElement('div');
+  div.innerHTML = `
+    <div data-tareas></div>
+    ${puedeCrear ? `
+      <h3 class="subtitulo">Nueva tarea</h3>
+      <form class="formulario" data-form-tarea>
+        <label class="campo"><span>Título</span><input name="titulo" required /></label>
+        <label class="campo"><span>Descripción (opcional)</span><textarea name="descripcion" rows="2"></textarea></label>
+        <div class="formulario__fila">
+          <label class="campo"><span>Prioridad</span><select name="prioridad">${opcionesSelect(Object.entries(PRIORIDAD_LABEL).map(([v, t]) => ({ v, t })), { valor: 'v', etiqueta: 't', seleccionado: 'media' })}</select></label>
+          <label class="campo"><span>Fecha límite (opcional)</span><input name="fecha_limite" type="date" /></label>
+        </div>
+        <button type="submit" class="boton boton--primario boton--ancho">${icono('mas', { tamano: 16 })} Crear tarea</button>
+      </form>
+    ` : ''}
+  `;
+  const { cerrar } = abrirModal({ titulo: `Tareas — ${grupo.nombre}`, contenido: div, ancho: 'normal' });
+
+  async function refrescar() {
+    const tareas = await fetchTareasGrupo(grupo.id);
+    if (tareas.length === 0) {
+      div.querySelector('[data-tareas]').innerHTML = '<p class="estado-vacio">Todavía no hay tareas para este grupo.</p>';
+      return;
+    }
+    const tabla = crearTabla([
+      { clave: 'titulo', titulo: 'Tarea' },
+      {
+        clave: 'estado',
+        titulo: 'Estado',
+        html: true,
+        render: (t) => `<span class="estado estado--${t.estado.replace(/_/g, '-')}">${ESTADO_TAREA_LABEL[t.estado]}</span>`,
+      },
+      { clave: 'prioridad', titulo: 'Prioridad', render: (t) => PRIORIDAD_LABEL[t.prioridad] },
+      {
+        clave: 'responsable',
+        titulo: 'Responsable',
+        html: true,
+        render: (t) => (t.responsable ? nombreCompleto(t.responsable.persona) : '<span class="texto-mudo">Disponible</span>'),
+      },
+      { clave: 'fecha_limite', titulo: 'Plazo', render: (t) => etiquetaPlazo(t) },
+    ], tareas);
+    div.querySelector('[data-tareas]').replaceChildren(tabla);
+  }
+
+  if (puedeCrear) {
+    div.querySelector('[data-form-tarea]').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const datos = datosFormulario(e.target);
+      const { error } = await supabase.from('tareas').insert({
+        titulo: datos.titulo,
+        descripcion: datos.descripcion,
+        prioridad: datos.prioridad,
+        fecha_limite: datos.fecha_limite,
+        supervisor_cargo_id: sesion.cargo.id,
+        grupo_trabajo_id: grupo.id,
+        creada_por: sesion.cargo.id,
+      });
+      if (error) { mostrarAviso(mensajeError(error), 'error'); return; }
+      mostrarAviso('Tarea creada.', 'exito');
+      e.target.reset();
+      await refrescar();
+    });
+  }
 
   refrescar();
   return { cerrar };
@@ -231,12 +315,19 @@ async function pintar(el) {
     if (!grupo) return;
     const td = tr.querySelector('td:last-child');
     td.className = 'tabla__acciones';
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'boton boton--fantasma boton--pequeno';
-    btn.textContent = 'Miembros';
-    btn.addEventListener('click', () => abrirModalMiembros(grupo));
-    td.appendChild(btn);
+    const btnMiembros = document.createElement('button');
+    btnMiembros.type = 'button';
+    btnMiembros.className = 'boton boton--fantasma boton--pequeno';
+    btnMiembros.textContent = 'Miembros';
+    btnMiembros.addEventListener('click', () => abrirModalMiembros(grupo));
+    td.appendChild(btnMiembros);
+
+    const btnTareas = document.createElement('button');
+    btnTareas.type = 'button';
+    btnTareas.className = 'boton boton--fantasma boton--pequeno';
+    btnTareas.textContent = 'Tareas';
+    btnTareas.addEventListener('click', () => abrirModalTareas(grupo));
+    td.appendChild(btnTareas);
   });
 
   el.querySelector('[data-lista]').replaceChildren(tabla);

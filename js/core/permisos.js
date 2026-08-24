@@ -50,3 +50,27 @@ export function puedeGestionarRamas(sesion) {
   if (!sesion) return false;
   return sesion.esSuperAdmin || ['sg', 'sga', 'sgl', 'subsecretario'].includes(sesion.cargo.tipo);
 }
+
+// Bloque A — igual que puedeGestionarRamas pero para UN grupo concreto, no
+// "alguna rama": sg/sga/sgl siempre (están por encima de toda subsecretaría/
+// comisión), un subsecretario solo si el grupo es de su propia rama. Espejo
+// de puede_gestionar_rama(g.subsecretaria_id, g.comision_id) — decide tanto
+// si se ve el botón "Crear tarea" de un grupo como si se ve el formulario de
+// creación de grupos_trabajo.js por fila.
+export function puedeGestionarEsteGrupo(sesion, grupo) {
+  if (!sesion) return false;
+  if (sesion.esSuperAdmin || ['sg', 'sga', 'sgl'].includes(sesion.cargo.tipo)) return true;
+  if (sesion.cargo.tipo !== 'subsecretario') return false;
+  return sesion.cargo.subsecretaria_id === grupo.subsecretaria_id
+    && sesion.cargo.comision_id === grupo.comision_id;
+}
+
+// Bloque A — toma/liberación voluntaria. Espejo de la rama nueva de
+// tareas_update (0035): mi cargo es miembro del grupo destinatario, y la
+// tarea está sin responsable (para tomarla) o el responsable soy yo mismo
+// (para liberarla). fn_toma_voluntaria_tarea es quien de verdad decide.
+export function puedeTomarTarea(sesion, tarea) {
+  if (!sesion || !tarea.grupo_trabajo_id) return false;
+  if (sesion.cargo.grupo_trabajo_id !== tarea.grupo_trabajo_id) return false;
+  return tarea.responsable_cargo_id === null || tarea.responsable_cargo_id === sesion.cargo.id;
+}

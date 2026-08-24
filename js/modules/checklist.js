@@ -31,7 +31,7 @@ async function cargarTareas() {
   const { data, error } = await supabase
     .from('tareas')
     .select(`
-      id, titulo, estado, prioridad, fecha_limite, progreso, responsable_cargo_id, supervisor_cargo_id,
+      id, titulo, estado, prioridad, fecha_limite, progreso, responsable_cargo_id, supervisor_cargo_id, grupo_trabajo_id,
       actividad:actividades(id, nombre, codigo, fase:fases_actividad(codigo, nombre, orden)),
       responsable:cargos!tareas_responsable_cargo_id_fkey(nombre, persona:personas(nombre, apellido))
     `)
@@ -81,7 +81,7 @@ function filaTarea(tarea, alTerminar) {
       ${esPrioridadAlta(tarea.prioridad) ? icono('estrella', { tamano: 12, clase: 'marcador-prioridad' }) : ''}<a href="/tarea.html?id=${tarea.id}">${escapeHtml(tarea.titulo)}</a>
       ${tarea.actividad ? `<div class="texto-mudo texto-pequeno">${escapeHtml(tarea.actividad.codigo)} · ${escapeHtml(tarea.actividad.nombre)}</div>` : ''}
     </td>
-    <td>${escapeHtml(nombreCompleto(tarea.responsable?.persona))}</td>
+    <td>${tarea.responsable ? escapeHtml(nombreCompleto(tarea.responsable.persona)) : (tarea.grupo_trabajo_id ? '<span class="texto-mudo">Disponible</span>' : escapeHtml(nombreCompleto(tarea.responsable?.persona)))}</td>
     <td class="${vencida ? 'texto-danger' : ''}">${etiquetaPlazo(tarea)}</td>
     <td><span class="${`estado estado--${tarea.estado.replace(/_/g, '-')}`}">${ESTADO_TAREA_LABEL[tarea.estado]}</span></td>
     <td class="tabla__acciones" data-acciones></td>

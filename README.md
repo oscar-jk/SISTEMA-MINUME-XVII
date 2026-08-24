@@ -202,6 +202,14 @@ frontend — `js/core/permisos.js` solo oculta botones. El detalle está en
   `puede_gestionar_rama()` — ver "Grupos de trabajo" abajo.
 - `0034` — bitácora en creación de `cargos`/`personas` (antes solo se
   auditaba el UPDATE de cargos).
+- `0035` — Bloque A: `tareas.grupo_trabajo_id`, "toma voluntaria",
+  `grupo_trabajo_actual()`, y cierra un hueco de autoridad en
+  `cargos.grupo_trabajo_id` — ver "Tareas de equipo" abajo.
+- `0036` — corrige `puede_ver_tarea()` (usada por `avances_select` e
+  `historial_reasignacion_select`) para reconocer la misma rama de grupo
+  que `0035` añadió a `tareas_select_rama` — encontrado probando en el
+  navegador, no en el diseño: un miembro de grupo veía la tarea pero no su
+  historial de avances ni de reasignación.
 
 Las únicas piezas que tocan la clave de servicio de Supabase son las
 Edge Functions (`crear-cuenta`, `restablecer-contrasena`,
@@ -342,6 +350,86 @@ Usar `cargos!superior_id(...)` compila pero resuelve la dirección
 contraria (los subordinados, no el superior) sin ningún error — se
 descubrió probando en el navegador con una sesión real, no leyendo la
 documentación.
+
+## Tareas de equipo (Bloque A)
+
+Bloque A de la especificación funcional: un `grupos_trabajo` (Bloque E)
+puede ser el destinatario de una tarea, y sus miembros la toman
+voluntariamente en vez de que alguien la asigne uno por uno.
+`tareas.grupo_trabajo_id` (`0035`) es nullable y sibling de
+`responsable_cargo_id`: una tarea de grupo nace con `responsable_cargo_id
+= null` (mismo patrón que `fn_desplegar_actividad` ya usaba para "hueco
+vacante") hasta que alguien la toma.
+
+**Quién puede dirigir una tarea a un grupo** no es `puede_asignar()` (el
+conjunto amplio que ya crea tareas individuales — incluye coordinador) sino
+`puede_gestionar_rama()`, la misma autoridad que ya gobierna crear el
+grupo y su membresía (Bloque E). Decisión explícita: un coordinador sigue
+creando tareas individuales como siempre, pero no puede dirigir trabajo al
+grupo completo — eso es del subsecretario dueño de esa rama (o quien esté
+por encima).
+
+**Hallazgo de seguridad durante el diseño, corregido en la misma
+migración**: `cargos.grupo_trabajo_id` (añadida en `0033`) nunca quedó
+protegida por `fn_validar_cambio_cargo` — `cargos_update` (`0009`) solo
+exige `puede_asignar() and es_descendiente(id)`, auto-inclusiva, así que
+cualquier coordinador podía unirse a sí mismo a cualquier grupo de su
+misma subsecretaría/comisión sin pasar por `puede_gestionar_rama()`
+(`fn_validar_grupo_cargo`, `0033`, solo valida que el grupo sea de la
+misma rama — consistencia referencial, no autoridad). Antes de este
+bloque era inofensivo; con Bloque A, la membresía decide qué tareas ves y
+puedes tomar — tan sensible como `tipo`/`superior_id`. Mismo patrón que
+el bug que cerró `0020`. Se corrigió extendiendo `fn_validar_cambio_cargo`
+para exigir `puede_gestionar_rama(new.subsecretaria_id, new.comision_id)`
+en cualquier cambio de `grupo_trabajo_id`.
+
+**Toma y liberación voluntaria** — `establecerResponsableGrupo()`
+(`tareas.js`) hace un `.update()` directo sobre `tareas`, sin RPC
+dedicada, gateado por dos capas (RLS decide qué filas se pueden tocar; un
+trigger nuevo decide qué cambio es legal en esa fila — mismo reparto que
+ya usa `fn_transicion_estado_tarea` con `progreso`):
+
+- `tareas_update` gana una rama que deja tocar una fila de grupo sin
+  responsable (para tomarla) o que ya tiene tomada quien la toca (para
+  liberarla), acotado a `grupo_trabajo_actual()` (función nueva, mismo
+  patrón que `superior_actual()`/`persona_visible()`, 0002).
+- `fn_toma_voluntaria_tarea` (trigger) exige que la transición sea
+  exactamente `null → yo` o `yo → null`, revalida la membresía contra
+  `cargos` en vez de confiar en que la RLS ya filtró bien, y rechaza el
+  cambio si cualquier otro campo se modifica en el mismo `UPDATE` — así
+  nadie cuela un cambio de título/prioridad/fecha límite disfrazado de
+  "tomar la tarea". Quien tiene autoridad real (supervisor de la tarea, un
+  ascendiente suyo, o super admin) sigue reasignando con libertad total,
+  sin esta restricción.
+- Dos voluntarios tomando la misma tarea a la vez no necesita `FOR
+  UPDATE` ni lock: Postgres re-evalúa `USING`/`WITH CHECK` contra la fila
+  ya comprometida (`EvalPlanQual`, READ COMMITTED estándar) — el segundo
+  simplemente afecta 0 filas, sin error. El frontend trata "0 filas
+  devueltas" como "ya la tomaron", no como fallo.
+- No hace falta una entrada nueva de bitácora: `historial_reasignacion_tarea`
+  (`0012`) ya audita cualquier cambio de `responsable_cargo_id` sin
+  importar qué trigger lo produjo — una toma queda como
+  `(responsable, null, <quien tomó>, cambiado_por=<quien tomó>)`,
+  distinguible de una reasignación manual porque `cargo_nuevo_id =
+  cambiado_por`.
+
+**Encontrado probando en el navegador, no en el diseño (`0036`)**:
+`puede_ver_tarea()` — la función que gatea `avances_select` (`0003`) e
+`historial_reasignacion_select` (`0012`) — nunca se actualizó junto con
+`tareas_select_rama`. Resultado: un miembro de grupo veía la fila de la
+tarea (por la rama nueva de `tareas_select_rama`) pero el historial de
+avances y de reasignación se veían vacíos sin ningún error — ambas
+consultas devuelven `[]` en silencio cuando RLS no encuentra filas, así
+que no había ninguna pista en consola. Se corrigió añadiendo la misma
+rama de grupo a `puede_ver_tarea()`, reutilizando `grupo_trabajo_actual()`.
+
+Dónde se ve en la interfaz: `grupos-trabajo.js` gana un botón "Tareas" por
+fila (modal con la lista + un formulario de creación visible solo si
+`puedeGestionarEsteGrupo(sesion, grupo)`); `mis-tareas.html` gana una
+sección "Tareas de mi grupo" debajo de la tabla personal, visible si
+`sesion.cargo.grupo_trabajo_id` existe, con botón "Tomar"/"Liberar" por
+fila; la ficha de una tarea (`tarea.html`) muestra "Grupo destinatario"
+cuando aplica y el mismo botón. No hace falta página ni ruta nueva.
 
 ## Actualizar `supabase-js`
 

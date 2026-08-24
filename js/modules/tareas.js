@@ -11,12 +11,13 @@ import {
 import { esqueletoTabla } from '../ui/esqueleto.js';
 import { crearTabla } from '../ui/tabla.js';
 import {
-  ESTADO_TAREA_LABEL, PRIORIDAD_LABEL, esPrioridadAlta, escapeHtml,
+  ESTADO_TAREA_LABEL, PRIORIDAD_LABEL, esPrioridadAlta, escapeHtml, nombreCompleto,
 } from '../utils/formato.js';
-import { puedeRegistrarAvance, puedeEnviarRevision } from '../core/permisos.js';
+import { puedeRegistrarAvance, puedeEnviarRevision, puedeTomarTarea } from '../core/permisos.js';
 
 let contenedor = null;
 let tareasCache = [];
+let tareasGrupoCache = [];
 let filtroActivo = 'todas';
 
 function urgenciaOrden(t) {
@@ -52,6 +53,51 @@ async function cargar() {
     return [];
   }
   return data;
+}
+
+// Bloque A — todas las tareas dirigidas a mi grupo de trabajo, tomadas o
+// no. A diferencia de cargar() (mis tareas, responsable_cargo_id = mi
+// cargo), aquí el filtro es por grupo, no por responsable: es visibilidad
+// de equipo, no una bandeja personal.
+async function cargarGrupo() {
+  const { sesion } = getEstado();
+  if (!sesion?.cargo.grupo_trabajo_id) return [];
+  const { data, error } = await supabase
+    .from('tareas')
+    .select('id, titulo, descripcion, estado, prioridad, fecha_limite, progreso, responsable_cargo_id, supervisor_cargo_id, grupo_trabajo_id, responsable:cargos!tareas_responsable_cargo_id_fkey(nombre, persona:personas(nombre, apellido))')
+    .eq('grupo_trabajo_id', sesion.cargo.grupo_trabajo_id)
+    .order('fecha_limite', { ascending: true, nullsFirst: false });
+
+  if (error) {
+    mostrarAviso(mensajeError(error), 'error');
+    return [];
+  }
+  return data;
+}
+
+// Bloque A — tomar (cargoId) o liberar (null) una tarea de grupo. Un
+// UPDATE directo, gateado por RLS + fn_toma_voluntaria_tarea (0035): igual
+// que grupos-trabajo.js añade/quita miembros con un simple .update() en
+// vez de una función dedicada. 0 filas devueltas (sin error) significa que
+// alguien más se adelantó — condición de carrera esperada, no una falla.
+export async function establecerResponsableGrupo(tarea, cargoIdONull, alTerminar) {
+  const { data, error } = await supabase
+    .from('tareas')
+    .update({ responsable_cargo_id: cargoIdONull })
+    .eq('id', tarea.id)
+    .select('id');
+
+  if (error) {
+    mostrarAviso(mensajeError(error), 'error');
+    return;
+  }
+  if (!data || data.length === 0) {
+    mostrarAviso('Ya no se puede — alguien más se adelantó, o la tarea cambió mientras tanto.', 'error');
+    (alTerminar || recargarSilencioso)();
+    return;
+  }
+  mostrarAviso(cargoIdONull ? 'Tarea tomada.' : 'Tarea liberada.', 'exito');
+  (alTerminar || recargarSilencioso)();
 }
 
 export function abrirHojaAvance(tarea, alGuardar) {
@@ -203,6 +249,85 @@ function pintar() {
   cuerpo.appendChild(tabla);
 }
 
+// Bloque A — mismas columnas que columnasTareas(), cambiando "Actividad"
+// por "Responsable" (aquí lo que importa es quién la tiene, o si está
+// disponible para tomar — no de qué actividad viene).
+function columnasTareasGrupo() {
+  return [
+    {
+      clave: 'estado',
+      titulo: 'Estado',
+      html: true,
+      render: (t) => `<span class="estado estado--${t.estado.replace(/_/g, '-')}">${ESTADO_TAREA_LABEL[t.estado]}</span>`,
+    },
+    {
+      clave: 'prioridad',
+      titulo: 'Prioridad',
+      html: true,
+      render: (t) => (esPrioridadAlta(t.prioridad) ? `<span class="prioridad prioridad--${t.prioridad}">${PRIORIDAD_LABEL[t.prioridad]}</span>` : '—'),
+    },
+    { clave: 'titulo', titulo: 'Tarea' },
+    {
+      clave: 'responsable',
+      titulo: 'Responsable',
+      html: true,
+      render: (t) => (t.responsable ? escapeHtml(nombreCompleto(t.responsable.persona)) : '<span class="texto-mudo">Disponible</span>'),
+      ordenarPor: (t) => (t.responsable ? nombreCompleto(t.responsable.persona) : ''),
+    },
+    {
+      clave: 'fecha_limite',
+      titulo: 'Plazo',
+      html: true,
+      render: (t) => `<span${estaVencida(t) ? ' class="texto-danger"' : ''}>${etiquetaPlazo(t)}</span>`,
+    },
+    { clave: 'acciones', titulo: '' },
+  ];
+}
+
+function adjuntarAccionesGrupo(tabla, lista) {
+  const { sesion } = getEstado();
+  tabla.querySelectorAll('tbody tr').forEach((tr, i) => {
+    const tarea = lista[i];
+    if (!tarea) return;
+    const td = tr.querySelector('td:last-child');
+    td.className = 'tabla__acciones';
+
+    if (puedeTomarTarea(sesion, tarea)) {
+      const tomando = tarea.responsable_cargo_id === null;
+      const boton = document.createElement('button');
+      boton.type = 'button';
+      boton.className = `boton boton--pequeno ${tomando ? 'boton--primario' : 'boton--secundario'}`;
+      boton.textContent = tomando ? 'Tomar' : 'Liberar';
+      boton.addEventListener('click', () => establecerResponsableGrupo(tarea, tomando ? sesion.cargo.id : null, recargarTodo));
+      td.appendChild(boton);
+    }
+
+    const verMas = document.createElement('button');
+    verMas.type = 'button';
+    verMas.className = 'boton boton--fantasma boton--pequeno';
+    verMas.textContent = 'Ver detalle';
+    verMas.addEventListener('click', () => { location.href = `/tarea.html?id=${tarea.id}`; });
+    td.appendChild(verMas);
+  });
+}
+
+function pintarGrupo() {
+  if (!contenedor) return;
+  const cuerpo = contenedor.querySelector('[data-lista-grupo]');
+  if (!cuerpo) return; // sin grupo de trabajo: la sección ni se renderiza.
+
+  if (tareasGrupoCache.length === 0) {
+    cuerpo.innerHTML = '<p class="estado-vacio">Todavía no hay tareas para tu grupo.</p>';
+    return;
+  }
+
+  const ordenada = ordenarPorUrgencia(tareasGrupoCache);
+  const tabla = crearTabla(columnasTareasGrupo(), ordenada);
+  adjuntarAccionesGrupo(tabla, ordenada);
+  cuerpo.innerHTML = '';
+  cuerpo.appendChild(tabla);
+}
+
 const FILTROS_VALIDOS = new Set(['todas', 'vencidas', 'en_curso', 'en_revision', 'completada']);
 
 // filtroInicial viene del tablero (?filtro=vencidas, por ejemplo) — un
@@ -211,6 +336,7 @@ const FILTROS_VALIDOS = new Set(['todas', 'vencidas', 'en_curso', 'en_revision',
 export async function render(el, filtroInicial) {
   contenedor = el;
   filtroActivo = FILTROS_VALIDOS.has(filtroInicial) ? filtroInicial : 'todas';
+  const { sesion } = getEstado();
   el.innerHTML = `
     <div class="vista-cabecera">
       <h1>Mis tareas</h1>
@@ -223,6 +349,10 @@ export async function render(el, filtroInicial) {
       </div>
     </div>
     <div data-lista>${esqueletoTabla()}</div>
+    ${sesion.cargo.grupo_trabajo_id ? `
+      <h2 class="subtitulo">Tareas de mi grupo</h2>
+      <div data-lista-grupo>${esqueletoTabla()}</div>
+    ` : ''}
   `;
 
   el.querySelector('[data-filtros]').addEventListener('click', (e) => {
@@ -233,8 +363,9 @@ export async function render(el, filtroInicial) {
     pintar();
   });
 
-  tareasCache = await cargar();
+  [tareasCache, tareasGrupoCache] = await Promise.all([cargar(), cargarGrupo()]);
   pintar();
+  pintarGrupo();
 
   window.addEventListener('minume:avance-sincronizado', recargarSilencioso);
 }
@@ -242,6 +373,15 @@ export async function render(el, filtroInicial) {
 async function recargarSilencioso() {
   tareasCache = await cargar();
   pintar();
+}
+
+// Bloque A — tomar/liberar puede mover una tarea dentro o fuera de "mis
+// tareas" (responsable_cargo_id cambia a mi cargo o vuelve a null), así
+// que refresca ambas secciones, no solo la de grupo.
+async function recargarTodo() {
+  [tareasCache, tareasGrupoCache] = await Promise.all([cargar(), cargarGrupo()]);
+  pintar();
+  pintarGrupo();
 }
 
 export function destroy() {

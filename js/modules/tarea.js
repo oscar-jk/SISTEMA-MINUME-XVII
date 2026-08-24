@@ -9,10 +9,11 @@ import {
   ESTADO_TAREA_LABEL, PRIORIDAD_LABEL, nombreCompleto, escapeHtml,
 } from '../utils/formato.js';
 import {
-  puedeRegistrarAvance, puedeEnviarRevision, puedeAprobarODevolver,
+  puedeRegistrarAvance, puedeEnviarRevision, puedeAprobarODevolver, puedeTomarTarea,
 } from '../core/permisos.js';
 import { montarEvidencia } from './evidencia-widget.js';
 import { esqueletoTexto } from '../ui/esqueleto.js';
+import { establecerResponsableGrupo } from './tareas.js';
 
 let contenedor = null;
 let idTarea = null;
@@ -24,7 +25,8 @@ async function cargarTarea(id) {
       *,
       actividad:actividades(id, codigo, nombre, fecha),
       responsable:cargos!tareas_responsable_cargo_id_fkey(id, nombre, persona:personas(nombre, apellido)),
-      supervisor:cargos!tareas_supervisor_cargo_id_fkey(id, nombre, persona:personas(nombre, apellido))
+      supervisor:cargos!tareas_supervisor_cargo_id_fkey(id, nombre, persona:personas(nombre, apellido)),
+      grupo_trabajo:grupos_trabajo(nombre)
     `)
     .eq('id', id)
     .single();
@@ -196,8 +198,9 @@ async function pintar() {
     ${tarea.descripcion ? `<p>${escapeHtml(tarea.descripcion)}</p>` : ''}
 
     <div class="ficha-datos">
-      <div><span>Responsable</span><strong>${escapeHtml(nombreCompleto(tarea.responsable?.persona))}</strong></div>
+      <div><span>Responsable</span><strong>${tarea.responsable ? escapeHtml(nombreCompleto(tarea.responsable.persona)) : (tarea.grupo_trabajo ? 'Disponible' : '—')}</strong></div>
       <div><span>Supervisor</span><strong>${escapeHtml(nombreCompleto(tarea.supervisor?.persona))}</strong></div>
+      ${tarea.grupo_trabajo ? `<div><span>Grupo destinatario</span><strong>${escapeHtml(tarea.grupo_trabajo.nombre)}</strong></div>` : ''}
       <div><span>Plazo</span><strong class="${vencida ? 'texto-danger' : ''}">${etiquetaPlazo(tarea)}</strong></div>
       <div><span>Progreso</span><strong>${tarea.progreso}%</strong></div>
     </div>
@@ -235,6 +238,15 @@ async function pintar() {
 
   const acciones = contenedor.querySelector('[data-acciones]');
   const refrescar = () => pintar();
+
+  if (puedeTomarTarea(sesion, tarea)) {
+    const tomando = tarea.responsable_cargo_id === null;
+    const b = document.createElement('button');
+    b.className = `boton ${tomando ? 'boton--primario' : 'boton--secundario'}`;
+    b.textContent = tomando ? 'Tomar tarea' : 'Liberar tarea';
+    b.addEventListener('click', () => establecerResponsableGrupo(tarea, tomando ? sesion.cargo.id : null, refrescar));
+    acciones.appendChild(b);
+  }
 
   if (puedeRegistrarAvance(sesion, tarea)) {
     const b = document.createElement('button');
