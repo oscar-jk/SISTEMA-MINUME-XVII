@@ -8,10 +8,10 @@ asistencia, espacios y plano, un tablero consolidado, y los catálogos y
 configuración que sostienen todo lo anterior — más una ronda de corrección
 de seguridad y bugs sobre esa base (migraciones `0019`–`0026`, ver
 "Seguridad" abajo). El sistema **no está completo** frente al catálogo
-maestro de 172 funcionalidades: evaluación por cortes, comisiones,
-consolidados en tiempo real, reportes/exportación, croquis público,
-planificación estratégica, hospedaje/regionales, auditoría completa y
-acreditación de delegados siguen sin construirse — ver "Fuera de alcance".
+maestro de 172 funcionalidades: comisiones, consolidados en tiempo real,
+reportes/exportación, croquis público, planificación estratégica,
+hospedaje/regionales, auditoría completa y acreditación de delegados
+siguen sin construirse — ver "Fuera de alcance".
 
 ## Identidad visual
 
@@ -243,6 +243,9 @@ frontend — `js/core/permisos.js` solo oculta botones. El detalle está en
   actividades` — activa Realtime para la pestaña "En vivo" de
   `espacios.html`, primera tabla en usar Realtime en todo el proyecto —
   ver "Realtime para En vivo" abajo.
+- `0043`-`0044` — Bloque F: activa `criterios_evaluacion`/`evaluaciones`/
+  `es_evaluador_de()` (dormidas desde `0001`/`0008`) — nueva página
+  `evaluaciones.html` — ver "Evaluación por cortes" abajo.
 
 Las únicas piezas que tocan la clave de servicio de Supabase son las
 Edge Functions (`crear-cuenta`, `restablecer-contrasena`,
@@ -793,6 +796,62 @@ estimación generosa de 500 eventos de fila en todo el período operativo del ev
 suscriptores concurrentes, 25,000 mensajes: 1.25% de la cuota mensual. Margen amplio en ambos
 casos, primera tabla en usar Realtime en el proyecto (`0042`).
 
+## Evaluación por cortes (Bloque F)
+
+`criterios_evaluacion`, `cortes_evaluacion` y `evaluaciones` existen desde `0001` con una sola
+política `for all using(es_super_admin())` cada una — hasta `0043`, solo el super admin podía
+siquiera leer estas tablas, no solo escribirlas. `cargos.evaluador_id` (también desde `0001`,
+mismo molde que `superior_id`) siempre coincidía con `superior_id` porque el frontend lo copiaba
+al crear un cargo — el comentario original en `0008`, justo encima de `es_evaluador_de()`, lo
+decía explícito: *"Preparación para V1.1 (permiso de calificar según evaluador asignado, no según
+jerarquía). Sin UI todavía."* Esa función nunca se llamó en ningún lado hasta este bloque.
+
+**`0043`** corrige primero un hueco de esquema de `0001`: `evaluaciones.corte_id`/`cargo_id`/
+`evaluador_id`/`criterio_id` eran nullable (dos de ellas con `on delete set null`, incompatible
+con `not null`) — se cambian esas dos FK a `on delete restrict` y las cuatro pasan a `not null`,
+habilitando un `unique(corte_id, cargo_id, criterio_id, evaluador_id)` real y un upsert directo
+con `onConflict` (sin el rodeo select-then-insert-or-update de `tolerancias_puntualidad`, que
+existía por índices *parciales* — aquí ninguna columna es nullable).
+
+`criterios_evaluacion`/`cortes_evaluacion` ganan una política de `select using(true)` — son
+catálogos, no datos sensibles, mismo tratamiento que `fases_actividad`/`subsecretarias`/
+`comisiones`. La política admin original se queda intacta sin partir: con el select ya maximal,
+que también la matchee como permisiva adicional no abre ninguna fuga (`true or es_super_admin()`
+sigue siendo `true`) — al revés del caso de `0037`/`0038`, donde el select implícito de un
+`for all` era *más angosto* de lo necesario.
+
+`evaluaciones` sí se parte en `select`/`insert`/`update` (sin `delete` — una nota se corrige por
+update, no se borra): el select acepta al super admin, al evaluador de sus propias filas
+enviadas, y al cargo evaluado viendo su propia nota (confirmado explícitamente: no es privado
+entre evaluador y admin). El insert exige `es_evaluador_de(cargo_id)`. Un trigger nuevo,
+`fn_validar_evaluacion` — mismo molde que `fn_toma_voluntaria_tarea`/`fn_transicion_solicitud_ayuda`
+(RLS decide ampliamente quién toca una fila, el trigger decide qué cambios son legales) — bloquea
+además: calificar "como" otro evaluador, calificar un cargo que no evalúas, escribir contra un
+corte ya `cerrado`, y cambiar las columnas de identidad en un `UPDATE` (corregir una nota no es
+reasignarla).
+
+**Hallazgo verificado antes de escribir la migración**: `cargos_select_rama` (`0003`) solo sigue
+`superior_actual()`/`es_descendiente()`, nunca `evaluador_id`. Hoy ambos siempre coinciden, pero
+toda la razón de ser de este bloque es dejarlos divergir — sin una política nueva
+(`cargos_select_evaluador`), un evaluador cuyo `evaluador_id` diverja de la jerarquía vería su
+RLS de `evaluaciones` funcionar pero el selector de "cargos que evalúo" vacío. Verificado en vivo
+con rol-impersonación SQL: un cargo de una rama completamente distinta a la del evaluador
+(invisible antes) se vuelve visible en cuanto su `evaluador_id` apunta a ese evaluador.
+
+**Nueva página `evaluaciones.html`**, trio calcado de `solicitudes-ayuda.*` (Bloque B), enlace
+incondicional en la barra lateral (mismo criterio que Solicitudes de ayuda — "evalúo a alguien"
+es un hecho por-instancia, no un nivel de rol fijo; la propia página maneja el estado vacío).
+Deja elegir un cargo de entre los que evalúas y un corte todavía abierto, calificar cada
+`criterios_evaluacion` activo con puntuación (0–10, escala asumida) y comentario, y guardar en un
+solo `upsert`. Debajo, "Mis evaluaciones recibidas" muestra las notas propias agrupadas por
+corte con un promedio ponderado (`Σ(puntuación×peso)/Σpeso`) calculado en el cliente sobre filas
+ya cargadas — no una vista ni función nueva, y explícitamente no es el feature de "reportes y
+exportación" (ese sigue fuera de alcance).
+
+`admin-configuracion.html` gana una sección de criterios (crear + activar/desactivar), calcada
+exacta de la sección de cortes que ya existía ahí — sin esto la tabla de rúbrica seguía sin
+ninguna fila que un evaluador pudiera calificar.
+
 ## Acreditación de delegados (SIRIO-ACR)
 
 `registro.html` es la única página pública de todo el sistema — sin
@@ -840,9 +899,7 @@ como delegado, mesa directiva, prensa, staff, etc. (9 roles, distintos de
 
 ## Fuera de alcance de esta ronda
 
-Del catálogo maestro de 172 funcionalidades: evaluación por cortes
-(rúbricas/pesos — las tablas base ya existen sin usar, ver
-`criterios_evaluacion`/`evaluaciones`/`es_evaluador_de()`), poblar los
+Del catálogo maestro de 172 funcionalidades: poblar los
 cargos reales de cada comisión/subsecretaría (el catálogo de las 15
 comisiones y las 3+5 subsecretarías ya existe — ver "Subsecretarías y
 comisiones" — pero los cargos concretos de cada una todavía no se cargan;

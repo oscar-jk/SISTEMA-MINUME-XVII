@@ -85,3 +85,16 @@ export function puedeTomarTarea(sesion, tarea) {
   if (sesion.cargo.grupo_trabajo_id !== tarea.grupo_trabajo_id) return false;
   return tarea.responsable_cargo_id === null || tarea.responsable_cargo_id === sesion.cargo.id;
 }
+
+// Bloque F — gestión de criterios de evaluación, solo super admin (mismo
+// nivel que cortes_evaluacion en admin-configuracion.js).
+export function puedeGestionarCriterios(sesion) {
+  return esAdmin(sesion);
+}
+
+// Bloque F — espejo optimista de es_evaluador_de() (0008/0043): compara
+// contra evaluador_id directamente, sin importar la jerarquía
+// (superior_id) — es justo la divergencia que este bloque activa.
+export function esEvaluadorDe(sesion, cargo) {
+  return !!sesion && !!cargo && sesion.cargo.id === cargo.evaluador_id;
+}

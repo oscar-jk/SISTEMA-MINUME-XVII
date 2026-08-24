@@ -141,6 +141,61 @@ async function pintarCortes(el) {
   el.querySelector('[data-lista]').replaceChildren(tabla);
 }
 
+// Bloque F — rúbrica de evaluación por cortes. Mismo patrón exacto que
+// pintarCortes(): crear + lista con toggle por fila (aquí activo/inactivo
+// en vez de cerrado/abierto).
+async function pintarCriterios(el) {
+  const { data: filas } = await supabase.from('criterios_evaluacion').select('*').order('codigo');
+  el.innerHTML = `
+    <h3 class="subtitulo" style="margin-top:0">Criterios de evaluación</h3>
+    <form class="formulario" data-form>
+      <div class="formulario__fila">
+        <label class="campo"><span>Código</span><input name="codigo" required /></label>
+        <label class="campo"><span>Nombre</span><input name="nombre" required /></label>
+        <label class="campo"><span>Peso</span><input name="peso" type="number" step="0.01" min="0.01" value="1" required /></label>
+      </div>
+      <label class="campo"><span>Descripción (opcional)</span><textarea name="descripcion" rows="2"></textarea></label>
+      <button type="submit" class="boton boton--secundario">${icono('mas', { tamano: 16 })} Crear criterio</button>
+    </form>
+    <div data-lista></div>
+  `;
+  el.querySelector('[data-form]').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const datos = datosFormulario(e.target);
+    datos.peso = Number(datos.peso);
+    const { error } = await supabase.from('criterios_evaluacion').insert(datos);
+    if (error) { mostrarAviso(mensajeError(error), 'error'); return; }
+    mostrarAviso('Criterio creado.', 'exito');
+    await pintarCriterios(el);
+  });
+
+  const tabla = crearTabla([
+    { clave: 'codigo', titulo: 'Código' },
+    { clave: 'nombre', titulo: 'Nombre' },
+    { clave: 'peso', titulo: 'Peso' },
+    { clave: 'activo', titulo: 'Activo', render: (f) => (f.activo ? 'Sí' : 'No') },
+  ], filas || []);
+
+  tabla.querySelectorAll('tbody tr').forEach((tr, i) => {
+    const criterio = (filas || [])[i];
+    if (!criterio) return;
+    const td = document.createElement('td');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'boton boton--fantasma boton--pequeno';
+    btn.textContent = criterio.activo ? 'Desactivar' : 'Activar';
+    btn.addEventListener('click', async () => {
+      const { error } = await supabase.from('criterios_evaluacion').update({ activo: !criterio.activo }).eq('id', criterio.id);
+      if (error) { mostrarAviso(mensajeError(error), 'error'); return; }
+      await pintarCriterios(el);
+    });
+    td.appendChild(btn);
+    tr.appendChild(td);
+  });
+
+  el.querySelector('[data-lista]').replaceChildren(tabla);
+}
+
 export async function render(el) {
   contenedor = el;
   const config = await fetchConfig();
@@ -148,9 +203,11 @@ export async function render(el) {
     <div class="vista-cabecera"><h1>Configuración</h1></div>
     <div data-fechas></div>
     <div data-cortes style="margin-top:2rem"></div>
+    <div data-criterios style="margin-top:2rem"></div>
   `;
   await pintarFechasYPurga(el.querySelector('[data-fechas]'), config);
   await pintarCortes(el.querySelector('[data-cortes]'));
+  await pintarCriterios(el.querySelector('[data-criterios]'));
 }
 
 export function destroy() {
