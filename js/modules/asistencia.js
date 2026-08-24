@@ -9,8 +9,8 @@ import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 import { crearTabla } from '../ui/tabla.js';
 import { esqueletoTabla } from '../ui/esqueleto.js';
 import { datosFormulario } from '../ui/formulario.js';
-import { nombreCompleto } from '../utils/formato.js';
-import { hoyISO } from '../utils/fechas.js';
+import { nombreCompleto, escapeHtml } from '../utils/formato.js';
+import { hoyISO, formatoHora } from '../utils/fechas.js';
 import { puedeAsignar } from '../core/permisos.js';
 
 let contenedor = null;
@@ -22,7 +22,7 @@ async function fetchMiHistorial() {
   const { sesion } = getEstado();
   const { data, error } = await supabase
     .from('asistencia')
-    .select('*')
+    .select('*, grupo_trabajo:grupos_trabajo(nombre, espacio:espacios(nombre))')
     .eq('cargo_id', sesion.cargo.id)
     .order('fecha', { ascending: false })
     .order('hora', { ascending: false })
@@ -31,24 +31,50 @@ async function fetchMiHistorial() {
   return data;
 }
 
+// El check-in ya no pide un lugar de texto libre — lee el grupo de
+// trabajo del cargo (ver 0033_grupos_trabajo.sql y el .select() de
+// sesion.js) y muestra tres estados: sin grupo, grupo inactivo, o grupo
+// activo con confirmación de un solo clic. Todo sale de `sesion`, sin ida
+// y vuelta al servidor para saber cuál mostrar.
 function marcar(tipo) {
+  const { sesion } = getEstado();
+  const grupo = sesion.cargo.grupo_trabajo;
+  const titulo = tipo === 'entrada' ? 'Marcar entrada' : 'Marcar salida';
   const div = document.createElement('div');
+
+  if (!grupo) {
+    const superior = sesion.cargo.superior;
+    const contacto = superior
+      ? `Contacta a ${escapeHtml(nombreCompleto(superior.persona))} (${escapeHtml(superior.nombre)})${superior.persona?.telefono ? ` · ${escapeHtml(superior.persona.telefono)}` : ''}.`
+      : 'Contacta a tu subsecretario o coordinador.';
+    div.innerHTML = `<p class="estado-vacio">Todavía no tienes un grupo de trabajo asignado. ${contacto}</p>`;
+    abrirModal({ titulo, contenido: div, ancho: 'angosto' });
+    return;
+  }
+
+  if (!grupo.activo) {
+    div.innerHTML = `<p class="estado-vacio">Tu grupo de trabajo (${escapeHtml(grupo.nombre)}) está inactivo. Contacta a tu subsecretario para que lo reactive o te reasigne.</p>`;
+    abrirModal({ titulo, contenido: div, ancho: 'angosto' });
+    return;
+  }
+
   div.innerHTML = `
-    <form class="formulario" data-form>
-      <label class="campo"><span>Lugar (opcional)</span><input name="lugar" placeholder="Ej. Sede Central" /></label>
-      <button type="submit" class="boton boton--primario boton--ancho">
-        ${icono('check', { tamano: 18 })} Confirmar ${tipo === 'entrada' ? 'entrada' : 'salida'}
-      </button>
-    </form>
+    <div class="formulario">
+      <p><strong>${escapeHtml(grupo.nombre)}</strong></p>
+      <p class="texto-mudo">${escapeHtml(grupo.espacio?.nombre ?? 'Sin espacio')} · ${formatoHora(grupo.hora_inicio)}–${formatoHora(grupo.hora_fin)}</p>
+      <form data-form>
+        <button type="submit" class="boton boton--primario boton--ancho">
+          ${icono('check', { tamano: 18 })} Confirmar ${tipo === 'entrada' ? 'entrada' : 'salida'}
+        </button>
+      </form>
+    </div>
   `;
-  const { cerrar } = abrirModal({ titulo: tipo === 'entrada' ? 'Marcar entrada' : 'Marcar salida', contenido: div, ancho: 'angosto' });
+  const { cerrar } = abrirModal({ titulo, contenido: div, ancho: 'angosto' });
 
   div.querySelector('[data-form]').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const { sesion } = getEstado();
-    const datos = datosFormulario(e.target);
     const { error } = await supabase.from('asistencia').insert({
-      cargo_id: sesion.cargo.id, tipo, lugar: datos.lugar || null,
+      cargo_id: sesion.cargo.id, tipo, grupo_trabajo_id: sesion.cargo.grupo_trabajo_id,
     });
     if (error) { mostrarAviso(mensajeError(error), 'error'); return; }
     mostrarAviso(tipo === 'entrada' ? 'Entrada marcada.' : 'Salida marcada.', 'exito');
@@ -84,7 +110,11 @@ async function pintarMiAsistencia(el) {
     { clave: 'fecha', titulo: 'Fecha' },
     { clave: 'tipo', titulo: 'Tipo', render: (f) => (f.tipo === 'entrada' ? 'Entrada' : 'Salida') },
     { clave: 'hora', titulo: 'Hora', render: (f) => f.hora.slice(0, 5) },
-    { clave: 'lugar', titulo: 'Lugar' },
+    {
+      clave: 'lugar',
+      titulo: 'Lugar',
+      render: (f) => (f.grupo_trabajo ? `${f.grupo_trabajo.nombre} · ${f.grupo_trabajo.espacio?.nombre ?? '—'}` : (f.lugar || '—')),
+    },
     { clave: 'puntual', titulo: 'Puntualidad', render: (f) => (f.puntual === null ? '—' : f.puntual ? 'A tiempo' : `Tarde (${f.minutos_tardanza} min)`) },
     { clave: 'estado', titulo: 'Estado', render: (f) => ESTADO_LABEL[f.estado] },
   ], filas);
@@ -135,7 +165,7 @@ async function aprobar(fila, alTerminar) {
 async function pintarAprobacion(el) {
   const { data, error } = await supabase
     .from('asistencia')
-    .select('*, cargo:cargos!asistencia_cargo_id_fkey(nombre, persona:personas(nombre, apellido))')
+    .select('*, cargo:cargos!asistencia_cargo_id_fkey(nombre, persona:personas(nombre, apellido)), grupo_trabajo:grupos_trabajo(nombre, espacio:espacios(nombre))')
     .in('estado', ['pendiente', 'aprobado'])
     .order('fecha', { ascending: false })
     .limit(50);
@@ -155,6 +185,11 @@ async function pintarAprobacion(el) {
     { clave: 'fecha', titulo: 'Fecha' },
     { clave: 'tipo', titulo: 'Tipo', render: (f) => (f.tipo === 'entrada' ? 'Entrada' : 'Salida') },
     { clave: 'hora', titulo: 'Hora', render: (f) => f.hora.slice(0, 5) },
+    {
+      clave: 'lugar',
+      titulo: 'Lugar',
+      render: (f) => (f.grupo_trabajo ? `${f.grupo_trabajo.nombre} · ${f.grupo_trabajo.espacio?.nombre ?? '—'}` : (f.lugar || '—')),
+    },
     { clave: 'estado', titulo: 'Estado', render: (f) => ESTADO_LABEL[f.estado] },
   ], filas);
 

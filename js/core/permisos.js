@@ -40,3 +40,13 @@ export function puedeEnviarRevision(sesion, tarea) {
 export function esAdmin(sesion) {
   return !!sesion && sesion.esSuperAdmin;
 }
+
+// Espejo optimista de puede_gestionar_rama() (ver 0033_grupos_trabajo.sql)
+// — oculta el formulario de crear/editar grupos de trabajo a quien de
+// todos modos RLS va a rechazar (coordinador/voluntario). La regla real
+// vive en la base: solo super_admin o un cargo tipo='subsecretario'
+// dentro de la propia rama puede escribir.
+export function puedeGestionarRamas(sesion) {
+  if (!sesion) return false;
+  return sesion.esSuperAdmin || ['sg', 'sga', 'sgl', 'subsecretario'].includes(sesion.cargo.tipo);
+}

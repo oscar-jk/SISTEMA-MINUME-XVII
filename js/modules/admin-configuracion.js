@@ -2,25 +2,13 @@
 // de evidencia, fechas del evento y ventanas de corte. Todo aquí, nada
 // codificado en el frontend.
 import { supabase } from '../core/supabase.js';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../config.js';
+import { llamarFuncion } from '../core/edge-functions.js';
 import { icono } from '../ui/icono.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 import { datosFormulario, opcionesSelect } from '../ui/formulario.js';
 import { crearTabla } from '../ui/tabla.js';
 
 let contenedor = null;
-
-async function llamarFuncion(nombre, cuerpo) {
-  const { data: { session } } = await supabase.auth.getSession();
-  const resp = await fetch(`${SUPABASE_URL}/functions/v1/${nombre}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}`, apikey: SUPABASE_ANON_KEY },
-    body: JSON.stringify(cuerpo),
-  });
-  const resultado = await resp.json();
-  if (!resp.ok) throw new Error(resultado.error || 'No se pudo completar la operación.');
-  return resultado;
-}
 
 async function fetchConfig() {
   const { data } = await supabase.from('configuracion_sistema').select('clave, valor');

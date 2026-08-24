@@ -19,7 +19,14 @@ async function cargarPerfil(userId) {
   const [{ data: cargos, error: ec }, { data: idActivo, error: eActivo }] = await Promise.all([
     supabase
       .from('cargos')
-      .select('id, nombre, tipo, division, subsecretaria:subsecretarias(nombre), comision:comisiones(nombre), superior_id, acceso_salud_acreditacion')
+      .select(`
+        id, nombre, tipo, division, superior_id, acceso_salud_acreditacion,
+        subsecretaria_id, comision_id,
+        subsecretaria:subsecretarias(nombre), comision:comisiones(nombre),
+        grupo_trabajo_id,
+        grupo_trabajo:grupos_trabajo!cargos_grupo_trabajo_id_fkey(nombre, hora_inicio, hora_fin, activo, espacio:espacios(nombre)),
+        superior:superior_id(nombre, persona:personas(nombre, apellido, telefono, correo))
+      `)
       .eq('persona_id', usuario.persona_id)
       .eq('activo', true)
       .order('creado_en'),

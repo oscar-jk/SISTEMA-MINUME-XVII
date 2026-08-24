@@ -35,13 +35,23 @@ Deno.serve(async (req) => {
 
   const { data: perfilLlamador, error: errPerfil } = await admin
     .from('usuarios')
-    .select('es_super_admin')
+    .select('es_super_admin, persona_id')
     .eq('id', user.id)
     .single();
 
   if (errPerfil || !perfilLlamador?.es_super_admin) {
     return json({ error: 'Solo el super admin puede crear cuentas.' }, 403);
   }
+
+  // Resuelve el cargo de quien llama para atribuirle la bitácora — el
+  // cliente service-role no tiene auth.uid(), así que cargo_actual() no
+  // sirve aquí (mismo patrón que alternar-cuenta/index.ts).
+  const { data: cargoLlamador } = await admin
+    .from('cargos')
+    .select('id')
+    .eq('persona_id', perfilLlamador.persona_id)
+    .eq('activo', true)
+    .maybeSingle();
 
   let cuerpo: { correo?: string; codigo_acceso?: string; persona_id?: string };
   try {
@@ -89,6 +99,14 @@ Deno.serve(async (req) => {
     await admin.auth.admin.deleteUser(nuevoUsuario.user.id);
     return json({ error: errEnlace.message }, 400);
   }
+
+  await admin.from('bitacora').insert({
+    tabla: 'usuarios',
+    registro_id: nuevoUsuario.user.id,
+    accion: 'cuenta_creada',
+    cargo_id: cargoLlamador?.id ?? null,
+    detalle: { persona_id, correo },
+  });
 
   return json({ ok: true, user_id: nuevoUsuario.user.id });
 });

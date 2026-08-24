@@ -14,6 +14,9 @@ const ACCION_LABEL = {
   cuenta_desactivada: 'Cuenta desactivada',
   evidencia_purgada: 'Evidencia purgada',
   asistencia_anulada: 'Asistencia anulada',
+  persona_creada: 'Persona creada',
+  cargo_creado: 'Cargo creado',
+  cuenta_creada: 'Cuenta creada',
 };
 
 async function cargar(filtros) {
@@ -65,6 +68,7 @@ export async function render(el) {
       <select name="tabla">
         <option value="">Toda tabla</option>
         <option value="cargos">Cargos</option>
+        <option value="personas">Personas</option>
         <option value="usuarios">Usuarios</option>
         <option value="evidencias">Evidencia</option>
         <option value="asistencia">Asistencia</option>

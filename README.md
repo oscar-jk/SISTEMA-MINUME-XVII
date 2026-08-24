@@ -198,6 +198,10 @@ frontend — `js/core/permisos.js` solo oculta botones. El detalle está en
 - `0030`-`0032` — normaliza `cargos.subsecretaria`/`comision` (texto
   libre) a FKs contra `subsecretarias`/`comisiones` — ver "Subsecretarías
   y comisiones" abajo.
+- `0033` — `grupos_trabajo` (Bloque E), `cargos.grupo_trabajo_id`,
+  `puede_gestionar_rama()` — ver "Grupos de trabajo" abajo.
+- `0034` — bitácora en creación de `cargos`/`personas` (antes solo se
+  auditaba el UPDATE de cargos).
 
 Las únicas piezas que tocan la clave de servicio de Supabase son las
 Edge Functions (`crear-cuenta`, `restablecer-contrasena`,
@@ -281,6 +285,63 @@ lo emparejaba por igualdad exacta de string). `0030`-`0032` lo normaliza:
   no había forma de remapear ese texto libre a una fila real sin
   inventar una, así que se dejaron con `subsecretaria_id`/`comision_id`
   en `null` en vez de borrarse.
+
+## Panel de desarrollador y grupos de trabajo
+
+Bloque E de la especificación funcional. Dos piezas:
+
+**Panel de desarrollador** (`admin-desarrollador.html`, solo super admin):
+crea persona + cargo + cuenta de acceso en un único flujo guiado, para los
+perfiles de más alto nivel (SG/SGA/SGL y subsecretarios) — antes crear una
+cuenta era un tercer paso desconectado en Cuentas, con un selector de
+persona que no heredaba nada de lo ya escrito. Escrituras secuenciales
+(persona → cargo → `crear-cuenta`), con el mismo estilo de mensaje de
+error de `crearPersonaYAsignar()` en `admin-personas.js`: si un paso falla
+a mitad de camino, el mensaje dice exactamente qué se guardó y dónde
+terminar manualmente. `0034` audita las tres creaciones en `bitácora` —
+antes ninguna de las tres se registraba, ni siquiera en el flujo cotidiano
+de `admin-personas.js`.
+
+**Grupos de trabajo** (`grupos-trabajo.html`, tabla `grupos_trabajo` —
+`0033`): un grupo pertenece a una subsecretaría o comisión (nunca ambas,
+nunca ninguna), tiene un espacio y un horario obligatorios, y sus miembros
+son simplemente los cargos con `grupo_trabajo_id` apuntándole — **un cargo
+pertenece a lo sumo un grupo**, sin tabla de unión; "tiene miembros" es
+`select * from cargos where grupo_trabajo_id = X`. Extensible a
+muchos-a-muchos después si hiciera falta, pero nada hoy lo necesita.
+
+Quién puede crear/editar un grupo no es solo el super admin — es
+`puede_gestionar_rama()`, una función nueva que autoriza a super admin o a
+cualquier cargo `tipo='subsecretario'` que sea ascendiente (o el propio)
+del grupo en cuestión. **Ojo con la trampa aquí**: `cargos.subsecretaria_id`/
+`comision_id` puede estar poblado en cualquier cargo de la rama (no solo
+en el del subsecretario — se denormaliza hacia abajo), y `es_descendiente()`
+es auto-inclusivo. Una función que solo comprobara "¿hay algún cargo con
+este subsecretaria_id en mi propio subárbol?" dejaría que un coordinador o
+un voluntario se autorizara a sí mismo. La función exige además
+`tipo='subsecretario'` en el cargo comparado — el único tipo que
+representa "dueño de la rama" — para cerrar ese hueco.
+
+El check-in (`asistencia.js`) ya no pide un `lugar` de texto libre: lee
+`sesion.cargo.grupo_trabajo` (embebido en el `.select()` de `sesion.js`) y
+muestra tres estados sin ida y vuelta al servidor — sin grupo (con el
+contacto real del superior, también embebido), grupo inactivo, o grupo
+activo con confirmación de un clic. La columna "Lugar" del historial cae
+de vuelta al `lugar` de texto en las filas viejas si no hay
+`grupo_trabajo_id` — sin necesidad de backfill.
+
+**Nota de PostgREST para el que edite `sesion.js`**: embeber una relación
+propia de una tabla consigo misma (`cargos.superior_id → cargos.id`) NO
+usa la sintaxis `tabla!nombre_constraint` que sí funciona para relaciones
+entre tablas distintas (como `grupos_trabajo!cargos_grupo_trabajo_id_fkey`,
+necesaria aquí porque `cargos` y `grupos_trabajo` tienen dos FKs entre sí
+— `cargos.grupo_trabajo_id` y `grupos_trabajo.creado_por` — y PostgREST no
+puede adivinar cuál). Para la auto-referencia, hay que usar el nombre de
+la columna directamente como alias de relación: `superior:superior_id(...)`.
+Usar `cargos!superior_id(...)` compila pero resuelve la dirección
+contraria (los subordinados, no el superior) sin ningún error — se
+descubrió probando en el navegador con una sesión real, no leyendo la
+documentación.
 
 ## Actualizar `supabase-js`
 
