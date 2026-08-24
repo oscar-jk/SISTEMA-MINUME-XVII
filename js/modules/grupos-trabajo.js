@@ -39,6 +39,12 @@ async function fetchComisiones() {
   const { data } = await supabase.from('comisiones').select('id, nombre').order('nombre');
   return data || [];
 }
+async function fetchTolerancias() {
+  const { data } = await supabase
+    .from('tolerancias_puntualidad')
+    .select('*, subsecretaria:subsecretarias(nombre), comision:comisiones(nombre)');
+  return data || [];
+}
 async function fetchConteoMiembros() {
   const { data } = await supabase.from('cargos').select('grupo_trabajo_id').not('grupo_trabajo_id', 'is', null);
   const conteo = {};
@@ -209,6 +215,98 @@ function abrirModalTareas(grupo) {
   return { cerrar };
 }
 
+// Bloque G — tolerancias de puntualidad. Vivía en admin-configuracion.html
+// (solo super admin); se muda aquí porque un subsecretario ahora administra
+// la tolerancia de SU propia rama (puede_gestionar_rama, 0038), igual que ya
+// administra sus propios grupos — esta página ya es donde llega. Mismo
+// patrón de autoscopeo que el formulario de "crear grupo": un subsecretario
+// no ve el <select> de rama, se fija a la suya; la opción "General (rama
+// por defecto)" solo existe para super_admin, es la única fila que sigue
+// siendo exclusivamente suya (puede_gestionar_rama(null, null) colapsa a
+// es_super_admin() en la base).
+async function pintarTolerancias(el, sesion, subsecretarias, comisiones) {
+  const esSubsecretario = sesion.cargo.tipo === 'subsecretario';
+  const filas = await fetchTolerancias();
+
+  el.innerHTML = `
+    <h3 class="subtitulo" style="margin-top:0">Tolerancias de puntualidad</h3>
+    <p class="texto-mudo">Hora programada y minutos de gracia para calcular la puntualidad de una rama. Un grupo de trabajo con hora de inicio propia tiene prioridad sobre esto.</p>
+    <form class="formulario" data-form-tolerancia>
+      ${esSubsecretario ? '' : `
+      <div class="formulario__fila">
+        <label class="campo">
+          <span>Rama</span>
+          <select name="objetivo" required>
+            <option value="">Elige una rama</option>
+            <optgroup label="Subsecretarías">${opcionesSelect(subsecretarias, { valor: (s) => `sub:${s.id}`, etiqueta: 'nombre' })}</optgroup>
+            <optgroup label="Comisiones">${opcionesSelect(comisiones, { valor: (c) => `com:${c.id}`, etiqueta: 'nombre' })}</optgroup>
+            ${sesion.esSuperAdmin ? '<option value="default">General (rama por defecto)</option>' : ''}
+          </select>
+        </label>
+      </div>`}
+      <div class="formulario__fila">
+        <label class="campo"><span>Hora programada</span><input name="hora_programada" type="time" required /></label>
+        <label class="campo"><span>Tolerancia (minutos)</span><input name="tolerancia_minutos" type="number" min="0" value="10" required /></label>
+      </div>
+      <button type="submit" class="boton boton--secundario">${icono('mas', { tamano: 16 })} Guardar</button>
+    </form>
+    <div data-lista-tolerancias></div>
+  `;
+
+  el.querySelector('[data-form-tolerancia]').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const datos = datosFormulario(e.target);
+    let fila;
+    if (esSubsecretario) {
+      fila = {
+        subsecretaria_id: sesion.cargo.subsecretaria_id,
+        comision_id: sesion.cargo.comision_id,
+        hora_programada: datos.hora_programada,
+        tolerancia_minutos: Number(datos.tolerancia_minutos),
+      };
+    } else {
+      const [prefijo, id] = (datos.objetivo || '').split(':');
+      if (!datos.objetivo) { mostrarAviso('Elige una rama.', 'error'); return; }
+      fila = {
+        subsecretaria_id: prefijo === 'sub' ? id : null,
+        comision_id: prefijo === 'com' ? id : null,
+        hora_programada: datos.hora_programada,
+        tolerancia_minutos: Number(datos.tolerancia_minutos),
+      };
+    }
+
+    // upsert con onConflict no sirve: el "conflicto" real vive en índices
+    // únicos PARCIALES (subsecretaria_id/comision_id/el índice constante
+    // de la fila default, ver 0030/0038), y PostgREST no puede inferir
+    // esos predicados — select-then-insert-or-update explícito, tres
+    // formas posibles ahora (antes solo dos): subsecretaría, comisión, o
+    // la fila "default" (ambas null, .eq no sirve para eso, hace falta .is).
+    let query = supabase.from('tolerancias_puntualidad').select('id');
+    query = fila.subsecretaria_id ? query.eq('subsecretaria_id', fila.subsecretaria_id)
+      : fila.comision_id ? query.eq('comision_id', fila.comision_id)
+      : query.is('subsecretaria_id', null).is('comision_id', null);
+    const { data: existente } = await query.maybeSingle();
+
+    const { error } = existente
+      ? await supabase.from('tolerancias_puntualidad').update(fila).eq('id', existente.id)
+      : await supabase.from('tolerancias_puntualidad').insert(fila);
+    if (error) { mostrarAviso(mensajeError(error), 'error'); return; }
+    mostrarAviso('Tolerancia guardada.', 'exito');
+    await pintarTolerancias(el, sesion, subsecretarias, comisiones);
+  });
+
+  el.querySelector('[data-lista-tolerancias]').replaceChildren(crearTabla([
+    {
+      clave: 'rama',
+      titulo: 'Rama',
+      render: (f) => f.subsecretaria?.nombre || f.comision?.nombre || 'General (por defecto)',
+      ordenarPor: (f) => f.subsecretaria?.nombre || f.comision?.nombre || '',
+    },
+    { clave: 'hora_programada', titulo: 'Hora programada', render: (f) => f.hora_programada.slice(0, 5) },
+    { clave: 'tolerancia_minutos', titulo: 'Tolerancia (min)' },
+  ], filas));
+}
+
 async function pintar(el) {
   const { sesion } = getEstado();
   const [grupos, espacios, subsecretarias, comisiones, conteo] = await Promise.all([
@@ -243,6 +341,7 @@ async function pintar(el) {
       </form>
     ` : ''}
     <div data-lista></div>
+    ${puedeCrear ? '<div data-tolerancias style="margin-top:2rem"></div>' : ''}
   `;
 
   if (puedeCrear && !esSubsecretario) {
@@ -288,6 +387,10 @@ async function pintar(el) {
       mostrarAviso('Grupo de trabajo creado.', 'exito');
       await pintar(el);
     });
+  }
+
+  if (puedeCrear) {
+    await pintarTolerancias(el.querySelector('[data-tolerancias]'), sesion, subsecretarias, comisiones);
   }
 
   if (grupos.length === 0) {

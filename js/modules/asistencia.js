@@ -18,6 +18,15 @@ let pestanaActiva = 'mia';
 
 const ESTADO_LABEL = { pendiente: 'Pendiente', aprobado: 'Aprobado', anulado: 'Anulado' };
 
+// Bloque G: insignia de color en vez de texto plano — mismo patrón que
+// .estado--completada/.estado--rechazada (css/componentes.css).
+function renderPuntualidad(f) {
+  if (f.puntual === null) return '—';
+  return f.puntual
+    ? '<span class="estado estado--puntual">A tiempo</span>'
+    : `<span class="estado estado--tarde">Tarde (${f.minutos_tardanza} min)</span>`;
+}
+
 async function fetchMiHistorial() {
   const { sesion } = getEstado();
   const { data, error } = await supabase
@@ -73,12 +82,16 @@ function marcar(tipo) {
 
   div.querySelector('[data-form]').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const { error } = await supabase.from('asistencia').insert({
+    // Bloque G: .select() trae de vuelta lo que fn_calcular_puntualidad()
+    // ya calculó server-side (cadena de precedencia grupo -> rama ->
+    // default) — feedback inmediato sin duplicar esa lógica en el cliente.
+    const { data, error } = await supabase.from('asistencia').insert({
       cargo_id: sesion.cargo.id, tipo, grupo_trabajo_id: sesion.cargo.grupo_trabajo_id,
-    });
+    }).select('puntual, minutos_tardanza').single();
     if (error) { mostrarAviso(mensajeError(error), 'error'); return; }
-    mostrarAviso(tipo === 'entrada' ? 'Entrada marcada.' : 'Salida marcada.', 'exito');
     cerrar();
+    const detalle = data.puntual === null ? '' : data.puntual ? ' — A tiempo.' : ` — Tarde (${data.minutos_tardanza} min).`;
+    mostrarAviso((tipo === 'entrada' ? 'Entrada marcada.' : 'Salida marcada.') + detalle, 'exito');
     pintarPestana();
   });
 }
@@ -115,7 +128,7 @@ async function pintarMiAsistencia(el) {
       titulo: 'Lugar',
       render: (f) => (f.grupo_trabajo ? `${f.grupo_trabajo.nombre} · ${f.grupo_trabajo.espacio?.nombre ?? '—'}` : (f.lugar || '—')),
     },
-    { clave: 'puntual', titulo: 'Puntualidad', render: (f) => (f.puntual === null ? '—' : f.puntual ? 'A tiempo' : `Tarde (${f.minutos_tardanza} min)`) },
+    { clave: 'puntual', titulo: 'Puntualidad', html: true, render: renderPuntualidad },
     { clave: 'estado', titulo: 'Estado', render: (f) => ESTADO_LABEL[f.estado] },
   ], filas);
 
@@ -190,6 +203,7 @@ async function pintarAprobacion(el) {
       titulo: 'Lugar',
       render: (f) => (f.grupo_trabajo ? `${f.grupo_trabajo.nombre} · ${f.grupo_trabajo.espacio?.nombre ?? '—'}` : (f.lugar || '—')),
     },
+    { clave: 'puntual', titulo: 'Puntualidad', html: true, render: renderPuntualidad },
     { clave: 'estado', titulo: 'Estado', render: (f) => ESTADO_LABEL[f.estado] },
   ], filas);
 

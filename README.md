@@ -218,6 +218,15 @@ frontend — `js/core/permisos.js` solo oculta botones. El detalle está en
   embed `persona:personas(...)` que colgaba de una fila de `cargos` en
   todo el proyecto necesitó el hint `!cargos_persona_id_fkey` para seguir
   resolviendo sin ambigüedad (PGRST201).
+- `0038` — Bloque G: `fn_calcular_puntualidad()` resuelve hora de puesto y
+  minutos de tolerancia por precedencia (grupo de trabajo → tolerancia de
+  rama → tolerancia default), activando `grupos_trabajo.hora_inicio`
+  (decorativa desde `0033`) y la fila "default" de `tolerancias_puntualidad`
+  (reservada desde `0030`, nunca usada) — ver "Hora de puesto y puntualidad
+  por precedencia" abajo. Backfill de datos reales encontrado al aplicar
+  esta migración, no datos de prueba: las dos filas sembradas en `0016`
+  ('Operaciones'/'Academica') nunca recibieron su `subsecretaria_id` al
+  normalizar en `0030`/`0032`, quedando indistinguibles de la fila default.
 
 Las únicas piezas que tocan la clave de servicio de Supabase son las
 Edge Functions (`crear-cuenta`, `restablecer-contrasena`,
@@ -515,6 +524,71 @@ parte del proyecto se volvió ambiguo (`PGRST201`) hasta agregar el hint
 `persona:personas!cargos_persona_id_fkey(...)` — rompió la carga de
 sesión y una docena de módulos más, encontrado recién al probar en el
 navegador después de aplicar la migración, no al diseñarla.
+
+## Hora de puesto y puntualidad por precedencia (Bloque G)
+
+Bloque G de la especificación funcional (`0038`): activa una pieza que existía desde
+Bloque E pero nunca se conectó a nada — `grupos_trabajo.hora_inicio` se mostraba en el
+check-in y nunca se comparaba contra nada — y una fila "default" de `tolerancias_puntualidad`
+reservada desde Bloque 0 (`ambos subsecretaria_id/comision_id null`) que ningún frontend
+producía ni el cálculo de puntualidad consultaba.
+
+**`fn_calcular_puntualidad()` ahora resuelve por precedencia real, no por la lógica ad hoc
+de antes** (que solo miraba la rama del cargo y nunca caía a ningún default):
+
+1. **Tier 1 (más específico)**: el grupo de trabajo ACTIVO real del cargo → su `hora_inicio`.
+   Resuelto siempre server-side desde `cargos.grupo_trabajo_id`, **nunca** desde el
+   `grupo_trabajo_id` que viaja en el propio insert de `asistencia.js` — `asistencia_insert`
+   (`0015`) solo valida `cargo_id = cargo_actual()`, nunca ese campo, así que confiar en el
+   valor del cliente habría dejado reclamar la `hora_inicio` de cualquier grupo activo ajeno
+   con un horario más favorable. Encontrado al diseñar esto, cerrado sin tocar RLS — el
+   trigger simplemente ignora el valor del cliente y vuelve a consultar la base.
+2. **Tier 2**: si no hay grupo, la fila de `tolerancias_puntualidad` de la rama del cargo.
+3. **Tier 3**: si tampoco, la fila "default" (ambas ramas `null`).
+
+Los minutos de tolerancia se resuelven aparte, siempre por la cadena rama→default (nunca del
+grupo, que no tiene ese campo) — si hay una hora resuelta por cualquier tier pero ninguna fila
+de tolerancia existe en absoluto, se usan 0 minutos de gracia en vez de omitir el cálculo.
+
+**La fila "default" nunca tuvo un índice único** que garantizara como máximo una — inofensivo
+mientras ningún frontend la producía, pero Bloque G es exactamente el que abre ese camino de
+UI. Cerrado con `create unique index ux_tolerancias_default on tolerancias_puntualidad ((1))
+where subsecretaria_id is null and comision_id is null` — el truco estándar de Postgres para
+"como máximo una fila que cumpla este predicado".
+
+**Datos reales encontrados al aplicar la migración, no datos de prueba**: las dos filas
+sembradas en `0016_seed_v1.sql` ('Operaciones' 08:00/10min, 'Academica' 08:30/15min) nunca
+recibieron su `subsecretaria_id` al normalizar en `0030`/`0032` — quedaron con
+`subsecretaria_id`/`comision_id` ambos `null`, indistinguibles de la fila default reservada.
+No eran datos de prueba a descartar (a diferencia de los cargos de prueba sin rama que Bloque
+0 sí dejó sin asignar a propósito): son tolerancia real ya configurada, así que se reubicaron
+por nombre antes de crear el índice único, en vez de perderse o convertirse en el default del
+evento por accidente.
+
+**Autoridad de escritura**: `tolerancias_puntualidad` solo la escribía el super admin desde
+`0015`, sin cambiar nunca — inconsistente con `grupos_trabajo`, que ya delega la propia rama
+al subsecretario dueño. Ahora usa `puede_gestionar_rama(subsecretaria_id, comision_id)`
+(`0033`, reutilizada sin cambios) para las tres políticas de escritura, dividida en
+`insert`/`update`/`delete` en vez de otra `for all` (mismo motivo documentado en Bloque B para
+`subsecretarias_escritura`/`comisiones_escritura`: el `using` de un `for all` también gatea
+SELECT como política permisiva adicional). Elegante por construcción: con ambas ramas `null`
+(la fila default), la cláusula interna de `puede_gestionar_rama` nunca es verdadera para
+ninguna fila, así que colapsa exactamente a `es_super_admin()` — la fila default sigue siendo
+exclusiva del super admin sin necesitar una condición aparte.
+
+**La UI de tolerancias se mudó** de `admin-configuracion.html` (solo super admin) a
+`grupos-trabajo.html` (ya visible para cualquier `puedeAsignar()`, ya el hogar de la
+administración de rama/grupo) — un subsecretario no tenía ni enlace ni razón de entrar a
+Configuración. Mismo patrón de autoscopeo que el formulario de "crear grupo" ya usaba: un
+subsecretario no ve el selector de rama (se fija a la suya), solo sg/sga/sgl/super_admin lo
+ven completo, y la opción "General (rama por defecto)" solo existe para super_admin.
+
+**`asistencia.js`**: el check-in da feedback inmediato ("Entrada marcada — Tarde (5 min).")
+leyendo `puntual`/`minutos_tardanza` del mismo insert (`.select()`), sin duplicar ninguna
+lógica de precedencia en el cliente. La columna "Puntualidad" pasó de texto plano a una
+insignia de color (`.estado--puntual`/`.estado--tarde`, mismo patrón que
+`.estado--completada`/`.estado--rechazada`), y la tabla de aprobación del supervisor —que
+antes no mostraba puntualidad en absoluto— ahora también la muestra.
 
 ## Actualizar `supabase-js`
 
