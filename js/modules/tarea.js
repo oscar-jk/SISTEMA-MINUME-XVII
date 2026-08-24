@@ -12,6 +12,7 @@ import {
   puedeRegistrarAvance, puedeEnviarRevision, puedeAprobarODevolver,
 } from '../core/permisos.js';
 import { montarEvidencia } from './evidencia-widget.js';
+import { esqueletoTexto } from '../ui/esqueleto.js';
 
 let contenedor = null;
 let idTarea = null;
@@ -150,8 +151,10 @@ function filaAvance(avance) {
         <strong>${escapeHtml(nombreCompleto(avance.autor?.persona))}</strong>
         <span>${new Date(avance.fecha).toLocaleString('es-DO', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</span>
       </div>
-      <div class="barra-progreso barra-progreso--pequena"><div class="barra-progreso__relleno" style="width:${avance.progreso_reportado}%"></div></div>
-      <p class="avance__progreso">${avance.progreso_reportado}%</p>
+      <div class="progreso-fila">
+        <div class="barra-progreso barra-progreso--pequena"><div class="barra-progreso__relleno" style="width:${avance.progreso_reportado}%"></div></div>
+        <span class="progreso-valor">${avance.progreso_reportado}%</span>
+      </div>
       ${avance.nota ? `<p class="avance__nota">${escapeHtml(avance.nota)}</p>` : ''}
     </li>
   `;
@@ -174,6 +177,12 @@ async function pintar() {
   const vencida = estaVencida(tarea);
 
   contenedor.innerHTML = `
+    <nav class="migas-pan" aria-label="Ruta de navegación">
+      <a href="/tablero.html">Tablero</a>
+      <span>›</span>
+      ${tarea.actividad ? `<a href="/actividad.html?id=${encodeURIComponent(tarea.actividad.id)}">${escapeHtml(tarea.actividad.codigo)}</a><span>›</span>` : ''}
+      <span class="migas-pan__actual">${escapeHtml(tarea.titulo)}</span>
+    </nav>
     <button type="button" class="boton boton--fantasma" data-volver>${icono('flecha-izq', { tamano: 16 })} Volver</button>
     <div class="vista-cabecera">
       <div>
@@ -261,7 +270,7 @@ async function pintar() {
 export async function render(el, params) {
   contenedor = el;
   idTarea = params.id;
-  el.innerHTML = '<p class="estado-vacio">Cargando…</p>';
+  el.innerHTML = esqueletoTexto(6);
   await pintar();
 }
 

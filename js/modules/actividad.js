@@ -4,6 +4,7 @@ import { abrirModal } from '../ui/modal.js';
 import { icono } from '../ui/icono.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 import { opcionesSelect } from '../ui/formulario.js';
+import { esqueletoTexto } from '../ui/esqueleto.js';
 import { formatoLargo, formatoHora } from '../utils/fechas.js';
 import {
   ESTADO_TAREA_LABEL, ESTADO_ACTIVIDAD_LABEL, PRIORIDAD_LABEL,
@@ -136,6 +137,11 @@ async function pintar() {
   const puede = puedeAsignar(sesion);
 
   contenedor.innerHTML = `
+    <nav class="migas-pan" aria-label="Ruta de navegación">
+      <a href="/tablero.html">Tablero</a>
+      <span>›</span>
+      <span class="migas-pan__actual">${escapeHtml(actividad.codigo)}</span>
+    </nav>
     <button type="button" class="boton boton--fantasma" data-volver>${icono('flecha-izq', { tamano: 16 })} Volver al calendario</button>
     <div class="vista-cabecera">
       <div>
@@ -193,7 +199,7 @@ async function pintar() {
 export async function render(el, params) {
   contenedor = el;
   idActividad = params.id;
-  el.innerHTML = '<p class="estado-vacio">Cargando…</p>';
+  el.innerHTML = esqueletoTexto(6);
   await pintar();
 }
 

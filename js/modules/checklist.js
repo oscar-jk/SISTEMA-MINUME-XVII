@@ -8,6 +8,7 @@ import { getEstado } from '../core/store.js';
 import { icono } from '../ui/icono.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 import { etiquetaPlazo, estaVencida } from '../utils/fechas.js';
+import { esqueletoTabla } from '../ui/esqueleto.js';
 import {
   ESTADO_TAREA_LABEL, nombreCompleto, escapeHtml, esPrioridadAlta,
 } from '../utils/formato.js';
@@ -187,7 +188,7 @@ export async function render(el) {
         ${opcionesEstado.map(([clave, etiqueta]) => `<button type="button" class="chip" data-estado="${clave}">${escapeHtml(etiqueta)}</button>`).join('')}
       </div>
     </div>
-    <div data-cuerpo><p class="estado-vacio">Cargando…</p></div>
+    <div data-cuerpo>${esqueletoTabla()}</div>
   `;
 
   el.querySelector('[data-buscar]').addEventListener('input', (e) => {

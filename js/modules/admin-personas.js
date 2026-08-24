@@ -2,11 +2,11 @@
 // no solo el super admin — cada quien dentro de su propia rama, según RLS.
 import { supabase } from '../core/supabase.js';
 import { getEstado } from '../core/store.js';
-import { pintarSubnavAdmin } from '../core/shell.js';
 import { icono } from '../ui/icono.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 import { datosFormulario, opcionesSelect } from '../ui/formulario.js';
 import { crearTabla } from '../ui/tabla.js';
+import { esqueletoTabla } from '../ui/esqueleto.js';
 import { abrirModal } from '../ui/modal.js';
 import { nombreCompleto, escapeHtml } from '../utils/formato.js';
 
@@ -211,7 +211,7 @@ async function pintarCargos(el) {
     { clave: 'nombre', titulo: 'Cargo' },
     { clave: 'tipo', titulo: 'Tipo' },
     { clave: 'division', titulo: 'División', render: (c) => (c.division || '—').toUpperCase() },
-    { clave: 'persona', titulo: 'Ocupante', html: true, render: (c) => (c.persona ? escapeHtml(nombreCompleto(c.persona)) : '<em>Vacante</em>') },
+    { clave: 'persona', titulo: 'Ocupante', html: true, render: (c) => (c.persona ? escapeHtml(nombreCompleto(c.persona)) : '<em>Vacante</em>'), ordenarPor: (c) => nombreCompleto(c.persona) },
     { clave: 'activo', titulo: 'Activo', render: (c) => (c.activo ? 'Sí' : 'No') },
     { clave: 'acceso_salud_acreditacion', titulo: 'Acceso a salud', render: (c) => (c.acceso_salud_acreditacion ? 'Sí' : 'No') },
   ], cargos);
@@ -256,7 +256,7 @@ const PESTANAS = {
 
 async function pintarPestana() {
   const cuerpo = contenedor.querySelector('[data-cuerpo-admin]');
-  cuerpo.innerHTML = '<p class="estado-vacio">Cargando…</p>';
+  cuerpo.innerHTML = esqueletoTabla();
   await PESTANAS[pestanaActiva].pintar(cuerpo);
 }
 
@@ -264,13 +264,11 @@ export async function render(el) {
   contenedor = el;
   el.innerHTML = `
     <div class="vista-cabecera"><h1>Personas y cargos</h1></div>
-    <div data-subnav-admin></div>
     <div class="filtros-chip" data-pestanas>
       ${Object.entries(PESTANAS).map(([clave, p]) => `<button type="button" class="chip${clave === pestanaActiva ? ' chip--activo' : ''}" data-pestana="${clave}">${p.titulo}</button>`).join('')}
     </div>
     <div data-cuerpo-admin></div>
   `;
-  pintarSubnavAdmin(el.querySelector('[data-subnav-admin]'), getEstado().sesion);
   el.querySelector('[data-pestanas]').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-pestana]');
     if (!btn) return;

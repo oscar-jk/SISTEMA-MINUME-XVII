@@ -17,7 +17,10 @@
   --surface: #FFFFFF;
   --ink: #15171C;
   --ink-2: #4A4D55;
-  --ink-3: #8A8D95;
+  --ink-3: #6E7178; /* K.6: el gris anterior (#8A8D95) daba ~3.15:1 sobre
+    --paper — insuficiente para texto normal (AA exige 4.5:1). Este tono
+    da ~4.6:1 sobre --paper y --surface, conservando la jerarquía "más
+    tenue que --ink-2" con la que ya se diseñó toda la interfaz. */
   --rule: #E2DFD6;
 
   /* Estados */
@@ -32,14 +35,19 @@
   --fuente-titulo: 'Barlow', -apple-system, 'Segoe UI', sans-serif;
   --fuente-texto: 'Public Sans', -apple-system, 'Segoe UI', sans-serif;
 
-  --texto-xs: 0.8125rem;   /* metadatos, etiquetas */
-  --texto-sm: 0.9375rem;   /* texto secundario */
+  /* Escala propia, proporción 1.2 sobre --texto-base — no la escala de
+     Tailwind renombrada al español que tenía antes. Los 5 nombres
+     semánticos no cambian, así que ningún sitio de uso se ve afectado. */
+  --texto-xs: 0.7rem;      /* metadatos, etiquetas */
+  --texto-sm: 0.83rem;     /* texto secundario */
   --texto-base: 1rem;      /* cuerpo */
-  --texto-lg: 1.375rem;    /* subtítulos de sección */
-  --texto-xl: 1.875rem;    /* títulos de pantalla */
+  --texto-lg: 1.2rem;      /* subtítulos de sección */
+  --texto-xl: 1.73rem;     /* títulos de pantalla */
 
-  --radio: 12px;
-  --radio-chico: 8px;
-  --sombra: 0 2px 10px rgba(10, 31, 56, 0.08);
+  /* Radios reducidos — el radio grande de 12px era el rasgo más
+     reconocible de plantilla genérica. La separación ahora es por línea
+     de 1px (--rule), no por sombra: --sombra queda eliminado. */
+  --radio: 4px;
+  --radio-chico: 2px;
   --toque-minimo: 44px;
 }

@@ -57,72 +57,81 @@
 .boton-icono:hover { background: var(--navy-900); color: #fff; }
 
 /* ------------------------------------------------------------------ chips */
+/* Filtro = pestaña con subrayado, no píldora — para no confundirse con
+   estado ni con el indicador de navegación activa (mismo defecto que K.1
+   diagnostica en el relleno navy sólido). */
 
 .chip {
   display: inline-flex;
   align-items: center;
   min-height: 36px;
-  padding: 0 0.9em;
-  border-radius: 999px;
-  border: 1px solid var(--rule);
-  background: var(--surface);
+  padding: 0 0.7em;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
   color: var(--ink-2);
   font-size: var(--texto-xs);
   font-weight: 600;
   cursor: pointer;
 }
 .chip--activo {
-  background: var(--navy-900);
-  border-color: var(--navy-900);
-  color: #fff;
+  border-bottom-color: var(--navy-700);
+  color: var(--navy-900);
 }
-.filtros-chip { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.75rem 0 1.25rem; }
+.filtros-chip { display: flex; flex-wrap: wrap; gap: 0.25rem; margin: 0.75rem 0 1.25rem; border-bottom: 1px solid var(--rule); }
 
 /* -------------------------------------------------------------- etiquetas */
+/* Estado = etiqueta rectangular con borde lateral de color, derivado de la
+   paleta navy/dorado propia — no los pasteles genéricos de antes. */
 
 .estado {
   display: inline-flex;
   align-items: center;
   font-size: var(--texto-xs);
   font-weight: 600;
-  padding: 0.15em 0.65em;
-  border-radius: 999px;
-  background: var(--rule);
+  padding: 0.2em 0.6em;
+  border-radius: var(--radio-chico);
+  border-left: 3px solid var(--ink-3);
+  background: var(--surface);
   color: var(--ink-2);
 }
-.estado--no-iniciada { background: #ECEAE3; color: var(--ink-2); }
-.estado--en-curso { background: #DCEAFE; color: var(--navy-700); }
-.estado--en-revision { background: var(--gold-100); color: var(--gold-600); }
-.estado--completada { background: #DBF0E6; color: var(--ok); }
-.estado--cancelada, .estado--no-aplica { background: #F1EFEA; color: var(--ink-3); }
-.estado--en-preparacion { background: #DCEAFE; color: var(--navy-700); }
-.estado--pendiente { background: var(--gold-100); color: var(--gold-600); }
-.estado--aprobada { background: #DBF0E6; color: var(--ok); }
-.estado--rechazada { background: #F6E2DE; color: var(--danger); }
-.estado--en-sesion { background: #DBF0E6; color: var(--ok); }
-.estado--proximo { background: var(--gold-100); color: var(--gold-600); }
-.estado--libre { background: #ECEAE3; color: var(--ink-2); }
-.estado--cerrado { background: #F1EFEA; color: var(--ink-3); }
+.estado--no-iniciada { border-left-color: var(--ink-3); color: var(--ink-2); }
+.estado--en-curso { border-left-color: var(--navy-500); color: var(--navy-700); }
+.estado--en-revision { border-left-color: var(--gold-500); color: var(--gold-600); }
+.estado--completada { border-left-color: var(--ok); color: var(--ok); }
+.estado--cancelada, .estado--no-aplica { border-left-color: var(--ink-3); color: var(--ink-3); }
+.estado--en-preparacion { border-left-color: var(--navy-500); color: var(--navy-700); }
+.estado--pendiente { border-left-color: var(--gold-500); color: var(--gold-600); }
+.estado--aprobada { border-left-color: var(--ok); color: var(--ok); }
+.estado--rechazada { border-left-color: var(--danger); color: var(--danger); }
+.estado--en-sesion { border-left-color: var(--ok); color: var(--ok); }
+.estado--proximo { border-left-color: var(--gold-500); color: var(--gold-600); }
+.estado--libre { border-left-color: var(--ink-3); color: var(--ink-2); }
+.estado--cerrado { border-left-color: var(--ink-3); color: var(--ink-3); }
 
+/* Prioridad = marca compacta, sin relleno — distinta de estado, que ahora
+   también usa borde lateral: prioridad no lleva fondo ni borde de caja. */
 .prioridad {
   display: inline-flex;
   align-items: center;
   font-size: var(--texto-xs);
-  font-weight: 600;
-  padding: 0.15em 0.65em;
-  border-radius: 999px;
-  border: 1px solid var(--rule);
-  color: var(--ink-2);
+  font-weight: 700;
+  padding: 0 0.4em;
+  color: var(--ink-3);
   margin-left: 0.4em;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
-.prioridad--alta { border-color: var(--gold-500); color: var(--gold-600); }
-.prioridad--critica { border-color: var(--danger); color: var(--danger); }
+.prioridad--alta { color: var(--gold-600); }
+.prioridad--critica { color: var(--danger); }
 
 /* ---------------------------------------------------------- barra de progreso */
+/* Progreso = barra recta, valor numérico tabular junto a ella (ver sitios
+   de uso en tareas.js/tarea.js) — sin radio de píldora. */
 
 .barra-progreso {
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--radio-chico);
   background: var(--rule);
   overflow: hidden;
   margin: 0.6em 0;
@@ -134,10 +143,11 @@
   border-radius: inherit;
   transition: width 0.3s ease;
 }
+.progreso-fila { display: flex; align-items: center; gap: 0.6em; margin: 0.6em 0; }
+.progreso-fila .barra-progreso { flex: 1; margin: 0; }
+.progreso-valor { flex-shrink: 0; font-size: var(--texto-xs); font-weight: 600; color: var(--ink-2); font-variant-numeric: tabular-nums; min-width: 2.4em; text-align: right; }
 
 /* ------------------------------------------------------------- tarjetas de tarea */
-
-.lista-tareas { display: flex; flex-direction: column; gap: 0.75rem; }
 
 .tarjeta-tarea {
   background: var(--surface);
@@ -297,7 +307,7 @@ input[type="range"].deslizador {
   background: var(--navy-900);
   color: #fff;
   font-size: var(--texto-sm);
-  box-shadow: var(--sombra);
+  border: 1px solid var(--navy-700);
   opacity: 0;
   transform: translateY(8px);
   transition: opacity 0.2s, transform 0.2s;
@@ -331,11 +341,73 @@ input[type="range"].deslizador {
 
 .tabla-envoltorio { overflow-x: auto; border: 1px solid var(--rule); border-radius: var(--radio); }
 .tabla { width: 100%; border-collapse: collapse; font-size: var(--texto-sm); }
-.tabla th, .tabla td { text-align: left; padding: 0.65em 0.9em; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+.tabla th, .tabla td { text-align: left; padding: 0.55em 0.9em; border-bottom: 1px solid var(--rule); white-space: nowrap; }
 .tabla th { background: var(--paper); color: var(--navy-700); font-weight: 600; font-size: var(--texto-xs); }
 .tabla tr:last-child td { border-bottom: none; }
 .tabla-vacia { color: var(--ink-3); text-align: center; }
 .tabla__acciones { display: flex; gap: 0.4rem; }
+
+/* K.4: encabezados ordenables — botón discreto, flecha solo visible en la
+   columna activa. */
+.tabla__orden {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+}
+.tabla__orden:hover { color: var(--navy-900); }
+.tabla__flecha-orden { opacity: 0.3; font-size: 0.85em; }
+.tabla__flecha-orden::after { content: '\2195'; }
+th[aria-sort="ascending"] .tabla__flecha-orden,
+th[aria-sort="descending"] .tabla__flecha-orden { opacity: 1; }
+th[aria-sort="ascending"] .tabla__flecha-orden::after { content: '\2191'; }
+th[aria-sort="descending"] .tabla__flecha-orden::after { content: '\2193'; }
+
+/* K.4: en móvil toda .tabla se apila como tarjetas — la fila deja de ser
+   una fila de tabla y pasa a ser un bloque con cada celda en su propia
+   línea, etiquetada con el título de columna (data-etiqueta, ver
+   js/ui/tabla.js). Es el mismo componente en escritorio y en móvil, sin
+   una segunda plantilla de tarjeta que mantener aparte. */
+@media (max-width: 640px) {
+  .tabla-envoltorio { border: none; overflow: visible; }
+  .tabla, .tabla tbody, .tabla tr, .tabla td { display: block; width: 100%; }
+  .tabla thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .tabla tr {
+    border: 1px solid var(--rule);
+    border-radius: var(--radio);
+    padding: 0.6rem 0.85rem;
+    margin-bottom: 0.6rem;
+    background: var(--surface);
+  }
+  .tabla td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.35em 0;
+    border-bottom: 1px solid var(--rule);
+    white-space: normal;
+    text-align: right;
+  }
+  .tabla tr:last-child, .tabla tr { border-bottom: 1px solid var(--rule); }
+  .tabla td:last-child { border-bottom: none; }
+  .tabla td::before {
+    content: attr(data-etiqueta);
+    font-weight: 600;
+    color: var(--ink-3);
+    font-size: var(--texto-xs);
+    text-align: left;
+    flex-shrink: 0;
+  }
+  .tabla td:not([data-etiqueta]) { justify-content: flex-end; }
+  .tabla__acciones { justify-content: flex-end; flex-wrap: wrap; }
+}
 
 /* -------------------------------------------------------------------- avances */
 
@@ -345,7 +417,6 @@ input[type="range"].deslizador {
   padding-left: 1rem;
 }
 .avance__cima { display: flex; justify-content: space-between; font-size: var(--texto-xs); color: var(--ink-3); }
-.avance__progreso { font-size: var(--texto-xs); color: var(--navy-700); font-weight: 600; margin: 0 0 0.2em; }
 .avance__nota { margin: 0; }
 
 /* --------------------------------------------------------------- ficha de datos */
@@ -362,6 +433,34 @@ input[type="range"].deslizador {
 }
 .ficha-datos span { display: block; font-size: var(--texto-xs); color: var(--ink-3); }
 .ficha-datos strong { font-family: var(--fuente-texto); font-variant-numeric: tabular-nums; }
+
+/* ----------------------------------------------------------- esqueletos */
+
+.esqueleto-tabla, .esqueleto-lista, .esqueleto-texto { display: flex; flex-direction: column; gap: 0.6rem; margin: 0.5rem 0; }
+.esqueleto-fila { display: flex; gap: 0.75rem; padding: 0.5em 0; }
+.esqueleto-tarjeta {
+  border: 1px solid var(--rule);
+  border-radius: var(--radio);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.esqueleto-celda, .esqueleto-linea {
+  display: block;
+  height: 13px;
+  border-radius: var(--radio-chico);
+  flex: 1;
+  background: linear-gradient(90deg, var(--rule) 25%, var(--paper) 50%, var(--rule) 75%);
+  background-size: 200% 100%;
+  animation: esqueleto-brillo 1.4s ease-in-out infinite;
+}
+.esqueleto-linea--corta { flex: none; width: 35%; }
+.esqueleto-linea--media { flex: none; width: 60%; }
+@keyframes esqueleto-brillo {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
 
 /* ------------------------------------------------------------- evidencia */
 

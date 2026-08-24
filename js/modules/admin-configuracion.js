@@ -2,8 +2,6 @@
 // de evidencia, fechas del evento y ventanas de corte. Todo aquí, nada
 // codificado en el frontend.
 import { supabase } from '../core/supabase.js';
-import { getEstado } from '../core/store.js';
-import { pintarSubnavAdmin } from '../core/shell.js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../config.js';
 import { icono } from '../ui/icono.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
@@ -188,12 +186,10 @@ export async function render(el) {
   const config = await fetchConfig();
   el.innerHTML = `
     <div class="vista-cabecera"><h1>Configuración</h1></div>
-    <div data-subnav-admin></div>
     <div data-fechas></div>
     <div data-tolerancias style="margin-top:2rem"></div>
     <div data-cortes style="margin-top:2rem"></div>
   `;
-  pintarSubnavAdmin(el.querySelector('[data-subnav-admin]'), getEstado().sesion);
   await pintarFechasYPurga(el.querySelector('[data-fechas]'), config);
   await pintarTolerancias(el.querySelector('[data-tolerancias]'));
   await pintarCortes(el.querySelector('[data-cortes]'));

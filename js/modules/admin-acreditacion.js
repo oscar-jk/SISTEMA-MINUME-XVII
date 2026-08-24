@@ -5,11 +5,11 @@
 // es solo para no mostrar un botón que va a fallar.
 import { supabase } from '../core/supabase.js';
 import { getEstado } from '../core/store.js';
-import { pintarSubnavAdmin } from '../core/shell.js';
 import { icono } from '../ui/icono.js';
 import { abrirModal } from '../ui/modal.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 import { crearTabla } from '../ui/tabla.js';
+import { esqueletoTabla } from '../ui/esqueleto.js';
 import { ROL_ACREDITACION_LABEL, ESTADO_ACREDITADO_LABEL, escapeHtml } from '../utils/formato.js';
 import { puedeAsignar } from '../core/permisos.js';
 
@@ -126,8 +126,8 @@ async function pintar() {
   const tabla = crearTabla([
     { clave: 'nombre', titulo: 'Nombre', render: (a) => `${a.nombre} ${a.apellido}` },
     { clave: 'rol', titulo: 'Rol', render: (a) => ROL_ACREDITACION_LABEL[a.rol] || a.rol },
-    { clave: 'regional', titulo: 'Regional', render: (a) => a.regional?.codigo ?? 'N/A' },
-    { clave: 'contacto', titulo: 'Contacto', render: (a) => a.telefono || a.correo || '—' },
+    { clave: 'regional', titulo: 'Regional', render: (a) => a.regional?.codigo ?? 'N/A', ordenarPor: (a) => a.regional?.codigo || '' },
+    { clave: 'contacto', titulo: 'Contacto', render: (a) => a.telefono || a.correo || '—', ordenarPor: (a) => a.telefono || a.correo || '' },
     { clave: 'estado', titulo: 'Estado', html: true, render: (a) => `<span class="estado estado--${a.estado === 'aprobado' ? 'completada' : a.estado === 'rechazado' ? 'cancelada' : 'no-iniciada'}">${escapeHtml(ESTADO_ACREDITADO_LABEL[a.estado])}</span>` },
     { clave: 'codigo_qr', titulo: 'Código' },
     { clave: 'acciones', titulo: '' },
@@ -188,7 +188,6 @@ export async function render(el) {
       <h1>Acreditación</h1>
       <span class="texto-mudo texto-pequeno" data-resumen></span>
     </div>
-    <div data-subnav-admin></div>
     <div class="checklist-filtros">
       <input type="search" placeholder="Buscar por nombre, correo o código…" data-buscar class="campo-buscar" />
       <div class="filtros-chip" data-estados>
@@ -198,10 +197,8 @@ export async function render(el) {
         <button type="button" class="chip" data-estado="rechazado">Rechazados</button>
       </div>
     </div>
-    <div data-cuerpo><p class="estado-vacio">Cargando…</p></div>
+    <div data-cuerpo>${esqueletoTabla()}</div>
   `;
-
-  pintarSubnavAdmin(el.querySelector('[data-subnav-admin]'), sesion);
 
   el.querySelector('[data-buscar]').addEventListener('input', (e) => {
     filtros.texto = e.target.value.trim();

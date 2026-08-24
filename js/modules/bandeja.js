@@ -4,6 +4,8 @@ import { icono } from '../ui/icono.js';
 import { abrirModal } from '../ui/modal.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 import { etiquetaPlazo, estaVencida } from '../utils/fechas.js';
+import { esqueletoTabla } from '../ui/esqueleto.js';
+import { crearTabla } from '../ui/tabla.js';
 import { ESTADO_TAREA_LABEL, nombreCompleto, escapeHtml } from '../utils/formato.js';
 
 let contenedor = null;
@@ -72,38 +74,67 @@ export async function aprobar(tarea, alTerminar) {
   await (alTerminar || recargar)();
 }
 
-function fila(tarea) {
-  const vencida = estaVencida(tarea);
-  const tr = document.createElement('tr');
-  tr.innerHTML = `
-    <td><a href="/tarea.html?id=${tarea.id}">${escapeHtml(tarea.titulo)}</a>${tarea.actividad ? `<div class="texto-mudo texto-pequeno">${escapeHtml(tarea.actividad.codigo)}</div>` : ''}</td>
-    <td><span class="${'estado estado--' + tarea.estado.replace(/_/g, '-')}">${ESTADO_TAREA_LABEL[tarea.estado]}</span></td>
-    <td>${escapeHtml(nombreCompleto(tarea.responsable?.persona))}</td>
-    <td class="${vencida ? 'texto-danger' : ''}">${etiquetaPlazo(tarea)}</td>
-    <td class="tabla__acciones" data-acciones></td>
-  `;
-  const acciones = tr.querySelector('[data-acciones]');
-  if (tarea.estado === 'en_revision') {
-    const aprobarBtn = document.createElement('button');
-    aprobarBtn.className = 'boton boton--primario boton--pequeno';
-    aprobarBtn.innerHTML = icono('check', { tamano: 14 });
-    aprobarBtn.title = 'Aprobar';
-    aprobarBtn.addEventListener('click', () => aprobar(tarea));
+function columnasBandeja() {
+  return [
+    {
+      clave: 'titulo',
+      titulo: 'Tarea',
+      html: true,
+      render: (t) => `<a href="/tarea.html?id=${t.id}">${escapeHtml(t.titulo)}</a>${t.actividad ? `<div class="texto-mudo texto-pequeno">${escapeHtml(t.actividad.codigo)}</div>` : ''}`,
+    },
+    {
+      clave: 'estado',
+      titulo: 'Estado',
+      html: true,
+      render: (t) => `<span class="estado estado--${t.estado.replace(/_/g, '-')}">${ESTADO_TAREA_LABEL[t.estado]}</span>`,
+    },
+    {
+      clave: 'responsable',
+      titulo: 'Responsable',
+      render: (t) => nombreCompleto(t.responsable?.persona),
+      ordenarPor: (t) => nombreCompleto(t.responsable?.persona),
+    },
+    {
+      clave: 'fecha_limite',
+      titulo: 'Plazo',
+      html: true,
+      render: (t) => `<span${estaVencida(t) ? ' class="texto-danger"' : ''}>${etiquetaPlazo(t)}</span>`,
+    },
+    { clave: 'acciones', titulo: '' },
+  ];
+}
 
-    const devolverBtn = document.createElement('button');
-    devolverBtn.className = 'boton boton--secundario boton--pequeno';
-    devolverBtn.textContent = 'Devolver';
-    devolverBtn.addEventListener('click', () => abrirHojaDevolucion(tarea, recargar));
+function adjuntarAcciones(tabla, lista) {
+  tabla.querySelectorAll('tbody tr').forEach((tr, i) => {
+    const tarea = lista[i];
+    if (!tarea) return;
+    const td = tr.querySelector('td:last-child');
+    td.className = 'tabla__acciones';
 
-    acciones.append(aprobarBtn, devolverBtn);
-  } else {
-    const verBtn = document.createElement('button');
-    verBtn.className = 'boton boton--fantasma boton--pequeno';
-    verBtn.textContent = 'Ver';
-    verBtn.addEventListener('click', () => { location.href = `/tarea.html?id=${tarea.id}`; });
-    acciones.appendChild(verBtn);
-  }
-  return tr;
+    if (tarea.estado === 'en_revision') {
+      const aprobarBtn = document.createElement('button');
+      aprobarBtn.type = 'button';
+      aprobarBtn.className = 'boton boton--primario boton--pequeno';
+      aprobarBtn.innerHTML = icono('check', { tamano: 14 });
+      aprobarBtn.title = 'Aprobar';
+      aprobarBtn.addEventListener('click', () => aprobar(tarea));
+
+      const devolverBtn = document.createElement('button');
+      devolverBtn.type = 'button';
+      devolverBtn.className = 'boton boton--secundario boton--pequeno';
+      devolverBtn.textContent = 'Devolver';
+      devolverBtn.addEventListener('click', () => abrirHojaDevolucion(tarea, recargar));
+
+      td.append(aprobarBtn, devolverBtn);
+    } else {
+      const verBtn = document.createElement('button');
+      verBtn.type = 'button';
+      verBtn.className = 'boton boton--fantasma boton--pequeno';
+      verBtn.textContent = 'Ver';
+      verBtn.addEventListener('click', () => { location.href = `/tarea.html?id=${tarea.id}`; });
+      td.appendChild(verBtn);
+    }
+  });
 }
 
 function pintar() {
@@ -113,13 +144,9 @@ function pintar() {
     return;
   }
   const ordenadas = [...tareas].sort((a, b) => orden(a) - orden(b));
+  const tabla = crearTabla(columnasBandeja(), ordenadas);
+  adjuntarAcciones(tabla, ordenadas);
   cuerpo.innerHTML = '';
-  const tabla = document.createElement('table');
-  tabla.className = 'tabla';
-  tabla.innerHTML = '<thead><tr><th>Tarea</th><th>Estado</th><th>Responsable</th><th>Plazo</th><th></th></tr></thead>';
-  const tbody = document.createElement('tbody');
-  for (const t of ordenadas) tbody.appendChild(fila(t));
-  tabla.appendChild(tbody);
   cuerpo.appendChild(tabla);
 }
 
@@ -133,7 +160,7 @@ export async function render(el) {
   const { sesion } = getEstado();
   el.innerHTML = `
     <div class="vista-cabecera"><h1>Bandeja de ${sesion.cargo.nombre}</h1></div>
-    <div data-cuerpo><p class="estado-vacio">Cargando…</p></div>
+    <div data-cuerpo>${esqueletoTabla()}</div>
   `;
   await recargar();
 }

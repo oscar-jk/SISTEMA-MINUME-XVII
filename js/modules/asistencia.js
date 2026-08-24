@@ -7,6 +7,7 @@ import { icono } from '../ui/icono.js';
 import { abrirModal } from '../ui/modal.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 import { crearTabla } from '../ui/tabla.js';
+import { esqueletoTabla } from '../ui/esqueleto.js';
 import { datosFormulario } from '../ui/formulario.js';
 import { nombreCompleto } from '../utils/formato.js';
 import { hoyISO } from '../utils/fechas.js';
@@ -150,7 +151,7 @@ async function pintarAprobacion(el) {
   }
 
   const tabla = crearTabla([
-    { clave: 'persona', titulo: 'Persona', render: (f) => nombreCompleto(f.cargo?.persona) },
+    { clave: 'persona', titulo: 'Persona', render: (f) => nombreCompleto(f.cargo?.persona), ordenarPor: (f) => nombreCompleto(f.cargo?.persona) },
     { clave: 'fecha', titulo: 'Fecha' },
     { clave: 'tipo', titulo: 'Tipo', render: (f) => (f.tipo === 'entrada' ? 'Entrada' : 'Salida') },
     { clave: 'hora', titulo: 'Hora', render: (f) => f.hora.slice(0, 5) },
@@ -182,7 +183,7 @@ async function pintarAprobacion(el) {
 
 async function pintarPestana() {
   const cuerpo = contenedor.querySelector('[data-cuerpo]');
-  cuerpo.innerHTML = '<p class="estado-vacio">Cargando…</p>';
+  cuerpo.innerHTML = esqueletoTabla();
   if (pestanaActiva === 'mia') await pintarMiAsistencia(cuerpo);
   else await pintarAprobacion(cuerpo);
 }

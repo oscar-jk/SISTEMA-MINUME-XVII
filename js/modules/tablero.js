@@ -7,6 +7,7 @@ import { getEstado } from '../core/store.js';
 import { icono } from '../ui/icono.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 import { crearTabla } from '../ui/tabla.js';
+import { esqueletoLista } from '../ui/esqueleto.js';
 import { puedeAsignar } from '../core/permisos.js';
 
 let contenedor = null;
@@ -53,7 +54,7 @@ export async function render(el) {
   const { sesion } = getEstado();
   const puede = puedeAsignar(sesion);
 
-  el.innerHTML = '<div class="vista-cabecera"><h1>Tablero</h1></div><p class="estado-vacio">Cargando…</p>';
+  el.innerHTML = `<div class="vista-cabecera"><h1>Tablero</h1></div>${esqueletoLista(4)}`;
   const datos = await fetchTodo();
   if (contenedor !== el) return;
 
@@ -123,6 +124,7 @@ export async function render(el) {
       clave: 'dotacion',
       titulo: 'Dotación cubierta/requerida',
       render: (f) => `${f.dotacion_cubierta}/${f.dotacion_requerida}`,
+      ordenarPor: (f) => f.dotacion_cubierta,
     },
   ], datos.actividades));
 }

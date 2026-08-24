@@ -8,6 +8,7 @@ import { icono } from '../ui/icono.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 import { nombreCompleto, escapeHtml, iniciales } from '../utils/formato.js';
 import { crearTabla } from '../ui/tabla.js';
+import { esqueletoTabla } from '../ui/esqueleto.js';
 
 let contenedor = null;
 let cargos = [];
@@ -49,7 +50,7 @@ function nodoHtml(cargo, profundidad) {
   const tieneHijos = cargo.hijos.length > 0;
   div.innerHTML = `
     <div class="organigrama-tarjeta">
-      ${tieneHijos ? `<button type="button" class="organigrama-toggle" aria-label="Expandir">${icono('flecha-der', { tamano: 14 })}</button>` : '<span class="organigrama-toggle-espacio"></span>'}
+      ${tieneHijos ? `<button type="button" class="organigrama-toggle" aria-expanded="false" aria-label="Expandir rama">${icono('flecha-der', { tamano: 14 })}</button>` : '<span class="organigrama-toggle-espacio"></span>'}
       <span class="organigrama-avatar">${escapeHtml(iniciales(cargo.persona?.nombre, cargo.persona?.apellido))}</span>
       <span class="organigrama-info">
         <strong>${escapeHtml(nombreCompleto(cargo.persona))}</strong>
@@ -64,16 +65,15 @@ function nodoHtml(cargo, profundidad) {
     for (const hijo of cargo.hijos) contHijos.appendChild(nodoHtml(hijo, profundidad + 1));
 
     const toggle = div.querySelector('.organigrama-toggle');
-    toggle.addEventListener('click', () => {
-      const abierto = !contHijos.hidden;
-      contHijos.hidden = abierto;
-      toggle.classList.toggle('organigrama-toggle--abierto', !abierto);
-    });
+    const fijarEstadoToggle = (abierto) => {
+      contHijos.hidden = !abierto;
+      toggle.classList.toggle('organigrama-toggle--abierto', abierto);
+      toggle.setAttribute('aria-expanded', String(abierto));
+      toggle.setAttribute('aria-label', abierto ? 'Contraer rama' : 'Expandir rama');
+    };
+    toggle.addEventListener('click', () => fijarEstadoToggle(contHijos.hidden));
     // Los primeros dos niveles empiezan abiertos; el resto, colapsado.
-    if (profundidad < 2) {
-      contHijos.hidden = false;
-      toggle.classList.add('organigrama-toggle--abierto');
-    }
+    fijarEstadoToggle(profundidad < 2);
   }
 
   return div;
@@ -111,24 +111,27 @@ function pintarDirectorio(el) {
   }
 
   const tabla = crearTabla([
-    { clave: 'persona', titulo: 'Nombre', render: (c) => nombreCompleto(c.persona) },
+    { clave: 'persona', titulo: 'Nombre', render: (c) => nombreCompleto(c.persona), ordenarPor: (c) => nombreCompleto(c.persona) },
     { clave: 'nombre', titulo: 'Cargo' },
     {
       clave: 'rama',
       titulo: 'División / rama',
       render: (c) => [c.division ? c.division.toUpperCase() : null, c.subsecretaria, c.comision].filter(Boolean).join(' · ') || '—',
+      ordenarPor: (c) => [c.division, c.subsecretaria, c.comision].filter(Boolean).join(' '),
     },
     {
       clave: 'correo',
       titulo: 'Correo',
       html: true,
       render: (c) => (c.persona?.correo ? `<a href="mailto:${escapeHtml(c.persona.correo)}">${escapeHtml(c.persona.correo)}</a>` : '—'),
+      ordenarPor: (c) => c.persona?.correo || '',
     },
     {
       clave: 'telefono',
       titulo: 'Teléfono',
       html: true,
       render: (c) => (c.persona?.telefono ? `<a href="tel:${escapeHtml(c.persona.telefono)}">${escapeHtml(c.persona.telefono)}</a>` : '—'),
+      ordenarPor: (c) => c.persona?.telefono || '',
     },
   ], lista);
 
@@ -159,7 +162,7 @@ export async function render(el) {
     <div data-buscar-envoltorio hidden>
       <input type="search" placeholder="Buscar por nombre, cargo, correo, subsecretaría o comisión…" data-buscar class="campo-buscar" />
     </div>
-    <div data-cuerpo><p class="estado-vacio">Cargando…</p></div>
+    <div data-cuerpo>${esqueletoTabla(6, 2)}</div>
   `;
 
   el.querySelector('[data-pestanas]').addEventListener('click', (e) => {

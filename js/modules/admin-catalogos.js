@@ -1,12 +1,11 @@
 // Catálogos administrables: propiedades, espacios, subsecretarías y fases.
 // Nada codificado — toda lista se administra aquí, sin desplegar.
 import { supabase } from '../core/supabase.js';
-import { getEstado } from '../core/store.js';
-import { pintarSubnavAdmin } from '../core/shell.js';
 import { icono } from '../ui/icono.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 import { datosFormulario, opcionesSelect } from '../ui/formulario.js';
 import { crearTabla } from '../ui/tabla.js';
+import { esqueletoTabla } from '../ui/esqueleto.js';
 import { abrirModal } from '../ui/modal.js';
 import { escapeHtml } from '../utils/formato.js';
 
@@ -75,10 +74,10 @@ async function pintarEspacios(el) {
   });
   el.querySelector('[data-lista]').replaceChildren(crearTabla([
     { clave: 'nombre', titulo: 'Nombre' },
-    { clave: 'propiedad', titulo: 'Propiedad', render: (f) => f.propiedad?.nombre ?? '—' },
+    { clave: 'propiedad', titulo: 'Propiedad', render: (f) => f.propiedad?.nombre ?? '—', ordenarPor: (f) => f.propiedad?.nombre || '' },
     { clave: 'piso', titulo: 'Piso' },
-    { clave: 'tipo', titulo: 'Tipo', render: (f) => f.tipo?.nombre ?? '—' },
-    { clave: 'estado', titulo: 'Estado', render: (f) => f.estado?.nombre ?? '—' },
+    { clave: 'tipo', titulo: 'Tipo', render: (f) => f.tipo?.nombre ?? '—', ordenarPor: (f) => f.tipo?.nombre || '' },
+    { clave: 'estado', titulo: 'Estado', render: (f) => f.estado?.nombre ?? '—', ordenarPor: (f) => f.estado?.nombre || '' },
     { clave: 'capacidad', titulo: 'Capacidad' },
   ], filas));
 }
@@ -199,7 +198,7 @@ const PESTANAS = {
 
 async function pintarPestana() {
   const cuerpo = contenedor.querySelector('[data-cuerpo]');
-  cuerpo.innerHTML = '<p class="estado-vacio">Cargando…</p>';
+  cuerpo.innerHTML = esqueletoTabla();
   await PESTANAS[pestanaActiva].pintar(cuerpo);
 }
 
@@ -207,13 +206,11 @@ export async function render(el) {
   contenedor = el;
   el.innerHTML = `
     <div class="vista-cabecera"><h1>Catálogos</h1></div>
-    <div data-subnav-admin></div>
     <div class="filtros-chip" data-pestanas>
       ${Object.entries(PESTANAS).map(([clave, p]) => `<button type="button" class="chip${clave === pestanaActiva ? ' chip--activo' : ''}" data-pestana="${clave}">${p.titulo}</button>`).join('')}
     </div>
     <div data-cuerpo></div>
   `;
-  pintarSubnavAdmin(el.querySelector('[data-subnav-admin]'), getEstado().sesion);
   el.querySelector('[data-pestanas]').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-pestana]');
     if (!btn) return;

@@ -6,6 +6,7 @@ import { icono } from '../ui/icono.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 import { datosFormulario, opcionesSelect } from '../ui/formulario.js';
 import { crearTabla } from '../ui/tabla.js';
+import { esqueletoTabla } from '../ui/esqueleto.js';
 import { nombreCompleto, escapeHtml } from '../utils/formato.js';
 import { hoyISO } from '../utils/fechas.js';
 import { montarPlano } from './plano-editor.js';
@@ -108,8 +109,9 @@ async function pintarEnVivo(el, espacios) {
         titulo: 'Estado ahora',
         html: true,
         render: (e) => `<span class="estado estado--${e.vivo.estado}">${escapeHtml(e.vivo.etiqueta)}</span>`,
+        ordenarPor: (e) => e.vivo.estado,
       },
-      { clave: 'detalle', titulo: 'Detalle', render: (e) => e.vivo.detalle },
+      { clave: 'detalle', titulo: 'Detalle', render: (e) => e.vivo.detalle, ordenarPor: (e) => e.vivo.detalle },
     ], vivos);
 
     const contTabla = el.querySelector('[data-tabla-envivo]');
@@ -204,10 +206,10 @@ async function pintarAsignaciones(el, espacios) {
   }
 
   const tabla = crearTabla([
-    { clave: 'espacio', titulo: 'Espacio', render: (a) => a.espacio?.nombre ?? '—' },
-    { clave: 'persona', titulo: 'Persona', render: (a) => nombreCompleto(a.cargo?.persona) },
+    { clave: 'espacio', titulo: 'Espacio', render: (a) => a.espacio?.nombre ?? '—', ordenarPor: (a) => a.espacio?.nombre || '' },
+    { clave: 'persona', titulo: 'Persona', render: (a) => nombreCompleto(a.cargo?.persona), ordenarPor: (a) => nombreCompleto(a.cargo?.persona) },
     { clave: 'fecha', titulo: 'Fecha' },
-    { clave: 'horario', titulo: 'Horario', render: (a) => `${a.hora_inicio}–${a.hora_fin}` },
+    { clave: 'horario', titulo: 'Horario', render: (a) => `${a.hora_inicio}–${a.hora_fin}`, ordenarPor: (a) => a.hora_inicio },
   ], asignaciones);
 
   if (puedeAsignar(sesion)) {
@@ -234,7 +236,7 @@ async function pintarPestana() {
     intervaloEnVivo = null;
   }
   const cuerpo = contenedor.querySelector('[data-cuerpo]');
-  cuerpo.innerHTML = '<p class="estado-vacio">Cargando…</p>';
+  cuerpo.innerHTML = esqueletoTabla();
   const espacios = await fetchEspacios();
   if (pestanaActiva === 'plano') await pintarPlano(cuerpo, espacios);
   else if (pestanaActiva === 'envivo') await pintarEnVivo(cuerpo, espacios);

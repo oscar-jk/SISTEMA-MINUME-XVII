@@ -3,12 +3,11 @@
 // por Edge Functions — son las únicas piezas que tocan la clave de
 // servicio de Supabase, nunca el navegador directamente.
 import { supabase } from '../core/supabase.js';
-import { getEstado } from '../core/store.js';
-import { pintarSubnavAdmin } from '../core/shell.js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../config.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 import { datosFormulario, opcionesSelect } from '../ui/formulario.js';
 import { crearTabla } from '../ui/tabla.js';
+import { esqueletoTabla } from '../ui/esqueleto.js';
 import { abrirModal } from '../ui/modal.js';
 import { nombreCompleto } from '../utils/formato.js';
 
@@ -108,8 +107,8 @@ async function pintar(el) {
   });
 
   const tabla = crearTabla([
-    { clave: 'persona', titulo: 'Persona', render: (c) => nombreCompleto(c.persona) },
-    { clave: 'correo', titulo: 'Correo', render: (c) => c.persona?.correo ?? '—' },
+    { clave: 'persona', titulo: 'Persona', render: (c) => nombreCompleto(c.persona), ordenarPor: (c) => nombreCompleto(c.persona) },
+    { clave: 'correo', titulo: 'Correo', render: (c) => c.persona?.correo ?? '—', ordenarPor: (c) => c.persona?.correo || '' },
     { clave: 'activa', titulo: 'Estado', render: (c) => (c.activa ? 'Activa' : 'Desactivada') },
   ], cuentas);
 
@@ -142,8 +141,7 @@ async function pintar(el) {
 }
 
 export async function render(el) {
-  el.innerHTML = '<div class="vista-cabecera"><h1>Cuentas</h1></div><div data-subnav-admin></div><div data-cuerpo><p class="estado-vacio">Cargando…</p></div>';
-  pintarSubnavAdmin(el.querySelector('[data-subnav-admin]'), getEstado().sesion);
+  el.innerHTML = `<div class="vista-cabecera"><h1>Cuentas</h1></div><div data-cuerpo>${esqueletoTabla()}</div>`;
   await pintar(el.querySelector('[data-cuerpo]'));
 }
 

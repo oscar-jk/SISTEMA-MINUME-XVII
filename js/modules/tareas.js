@@ -8,8 +8,10 @@ import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 import {
   estaVencida, etiquetaPlazo,
 } from '../utils/fechas.js';
+import { esqueletoTabla } from '../ui/esqueleto.js';
+import { crearTabla } from '../ui/tabla.js';
 import {
-  ESTADO_TAREA_LABEL, esPrioridadAlta, escapeHtml,
+  ESTADO_TAREA_LABEL, PRIORIDAD_LABEL, esPrioridadAlta, escapeHtml,
 } from '../utils/formato.js';
 import { puedeRegistrarAvance, puedeEnviarRevision } from '../core/permisos.js';
 
@@ -105,53 +107,79 @@ export async function enviarARevision(tarea, alTerminar) {
   (alTerminar || pintar)();
 }
 
-function tarjeta(tarea) {
+// K.4: tabla densa y ordenable en vez de tarjetas — en móvil, css/componentes.css
+// apila la misma tabla como tarjetas (ver la media query junto a .tabla),
+// así que no hay una segunda plantilla de tarjeta que mantener aparte.
+function columnasTareas() {
+  return [
+    {
+      clave: 'estado',
+      titulo: 'Estado',
+      html: true,
+      render: (t) => `<span class="estado estado--${t.estado.replace(/_/g, '-')}">${ESTADO_TAREA_LABEL[t.estado]}</span>`,
+    },
+    {
+      clave: 'prioridad',
+      titulo: 'Prioridad',
+      html: true,
+      render: (t) => (esPrioridadAlta(t.prioridad) ? `<span class="prioridad prioridad--${t.prioridad}">${PRIORIDAD_LABEL[t.prioridad]}</span>` : '—'),
+    },
+    { clave: 'titulo', titulo: 'Tarea' },
+    {
+      clave: 'actividad',
+      titulo: 'Actividad',
+      render: (t) => (t.actividad ? `${t.actividad.codigo} · ${t.actividad.nombre}` : '—'),
+      ordenarPor: (t) => t.actividad?.codigo || '',
+    },
+    {
+      clave: 'fecha_limite',
+      titulo: 'Plazo',
+      html: true,
+      render: (t) => `<span${estaVencida(t) ? ' class="texto-danger"' : ''}>${etiquetaPlazo(t)}</span>`,
+    },
+    {
+      clave: 'progreso',
+      titulo: 'Progreso',
+      html: true,
+      render: (t) => `<div class="progreso-fila"><div class="barra-progreso barra-progreso--pequena"><div class="barra-progreso__relleno" style="width:${t.progreso}%"></div></div><span class="progreso-valor">${t.progreso}%</span></div>`,
+    },
+    { clave: 'acciones', titulo: '' },
+  ];
+}
+
+function adjuntarAcciones(tabla, lista) {
   const { sesion } = getEstado();
-  const vencida = estaVencida(tarea);
-  const art = document.createElement('article');
-  art.className = `tarjeta-tarea${vencida ? ' tarjeta-tarea--vencida' : ''}`;
+  tabla.querySelectorAll('tbody tr').forEach((tr, i) => {
+    const tarea = lista[i];
+    if (!tarea) return;
+    const td = tr.querySelector('td:last-child');
+    td.className = 'tabla__acciones';
 
-  const marcador = esPrioridadAlta(tarea.prioridad) ? icono('estrella', { tamano: 14, clase: 'marcador-prioridad' }) : '';
+    if (puedeRegistrarAvance(sesion, tarea)) {
+      const boton = document.createElement('button');
+      boton.type = 'button';
+      boton.className = 'boton boton--primario boton--pequeno';
+      boton.innerHTML = `${icono('mas', { tamano: 14 })} Avance`;
+      boton.addEventListener('click', () => abrirHojaAvance(tarea, pintar));
+      td.appendChild(boton);
+    }
 
-  art.innerHTML = `
-    <div class="tarjeta-tarea__cima">
-      <span class="${'estado estado--' + tarea.estado.replace(/_/g, '-')}">${ESTADO_TAREA_LABEL[tarea.estado]}</span>
-      <span class="tarjeta-tarea__plazo${vencida ? ' texto-danger' : ''}">${etiquetaPlazo(tarea)}</span>
-    </div>
-    <h3 class="tarjeta-tarea__titulo">${marcador}${escapeHtml(tarea.titulo)}</h3>
-    ${tarea.actividad ? `<p class="tarjeta-tarea__actividad">${escapeHtml(tarea.actividad.codigo)} · ${escapeHtml(tarea.actividad.nombre)}</p>` : ''}
-    <div class="barra-progreso"><div class="barra-progreso__relleno" style="width:${tarea.progreso}%"></div></div>
-    <div class="tarjeta-tarea__acciones"></div>
-  `;
+    if (puedeEnviarRevision(sesion, tarea)) {
+      const boton = document.createElement('button');
+      boton.type = 'button';
+      boton.className = 'boton boton--secundario boton--pequeno';
+      boton.textContent = 'Enviar a revisión';
+      boton.addEventListener('click', () => enviarARevision(tarea));
+      td.appendChild(boton);
+    }
 
-  const acciones = art.querySelector('.tarjeta-tarea__acciones');
-
-  if (puedeRegistrarAvance(sesion, tarea)) {
-    const boton = document.createElement('button');
-    boton.type = 'button';
-    boton.className = 'boton boton--primario';
-    boton.innerHTML = `${icono('mas', { tamano: 16 })} Registrar avance`;
-    boton.addEventListener('click', () => abrirHojaAvance(tarea, pintar));
-    acciones.appendChild(boton);
-  }
-
-  if (puedeEnviarRevision(sesion, tarea)) {
-    const boton = document.createElement('button');
-    boton.type = 'button';
-    boton.className = 'boton boton--secundario';
-    boton.textContent = 'Enviar a revisión';
-    boton.addEventListener('click', () => enviarARevision(tarea));
-    acciones.appendChild(boton);
-  }
-
-  const verMas = document.createElement('button');
-  verMas.type = 'button';
-  verMas.className = 'boton boton--fantasma';
-  verMas.textContent = 'Ver detalle';
-  verMas.addEventListener('click', () => { location.href = `/tarea.html?id=${tarea.id}`; });
-  acciones.appendChild(verMas);
-
-  return art;
+    const verMas = document.createElement('button');
+    verMas.type = 'button';
+    verMas.className = 'boton boton--fantasma boton--pequeno';
+    verMas.textContent = 'Ver detalle';
+    verMas.addEventListener('click', () => { location.href = `/tarea.html?id=${tarea.id}`; });
+    td.appendChild(verMas);
+  });
 }
 
 function pintar() {
@@ -161,14 +189,18 @@ function pintar() {
     : tareasCache.filter((t) => t.estado === filtroActivo);
 
   const cuerpo = contenedor.querySelector('[data-lista]');
-  cuerpo.innerHTML = '';
   if (lista.length === 0) {
-    cuerpo.innerHTML = '<p class="estado-vacio">No hay tareas en este filtro.</p>';
+    cuerpo.innerHTML = filtroActivo === 'todas' && tareasCache.length === 0
+      ? '<div class="estado-vacio"><div>Todavía no tienes tareas asignadas.</div><div class="texto-pequeno">Cuando tu supervisor te asigne una, aparece aquí.</div></div>'
+      : '<p class="estado-vacio">No hay tareas con este filtro.</p>';
     return;
   }
-  for (const tarea of ordenarPorUrgencia(lista)) {
-    cuerpo.appendChild(tarjeta(tarea));
-  }
+
+  const ordenada = ordenarPorUrgencia(lista);
+  const tabla = crearTabla(columnasTareas(), ordenada);
+  adjuntarAcciones(tabla, ordenada);
+  cuerpo.innerHTML = '';
+  cuerpo.appendChild(tabla);
 }
 
 const FILTROS_VALIDOS = new Set(['todas', 'vencidas', 'en_curso', 'en_revision', 'completada']);
@@ -190,7 +222,7 @@ export async function render(el, filtroInicial) {
         <button type="button" class="chip${filtroActivo === 'completada' ? ' chip--activo' : ''}" data-filtro="completada">Completadas</button>
       </div>
     </div>
-    <div class="lista-tareas" data-lista><p class="estado-vacio">Cargando…</p></div>
+    <div data-lista>${esqueletoTabla()}</div>
   `;
 
   el.querySelector('[data-filtros]').addEventListener('click', (e) => {

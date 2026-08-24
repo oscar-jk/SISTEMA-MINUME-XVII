@@ -18,13 +18,24 @@ acreditación de delegados siguen sin construirse — ver "Fuera de alcance".
 Tipografía tomada de [plerd.minerd.gob.do](https://plerd.minerd.gob.do)
 (el sitio del programa que sostiene a MINUME): **Barlow** para títulos
 (peso 800, el mismo par de familias que usa PLERD) y **Public Sans**
-para todo lo demás — reemplazan a Fraunces/Source Sans 3. El radio de
-esquina (`--radio`/`--radio-chico`, `css/tokens.css`) se alineó a los
-8–12px que usa PLERD en botones y tarjetas. El **color no se tomó de
-PLERD** (que usa azul/morado/ámbar de una plantilla MUI genérica):
-SIRIO mantiene su propio navy + dorado, ligado al nombre ("la estrella
-más brillante") y a "MINUME de Estrellas" — decisión explícita, no un
-descuido.
+para todo lo demás — reemplazan a Fraunces/Source Sans 3, y se conservan
+sin cambios en la Ronda 2. El **color no se tomó de PLERD** (que usa
+azul/morado/ámbar de una plantilla MUI genérica): SIRIO mantiene su
+propio navy + dorado, ligado al nombre ("la estrella más brillante") y a
+"MINUME de Estrellas" — decisión explícita, no un descuido.
+
+Sistema de formas (Ronda 2, `css/tokens.css` y `css/componentes.css`):
+el radio de esquina bajó de 8–12px a 2–4px (`--radio`/`--radio-chico`) y
+`--sombra` se eliminó — la separación es por línea de 1px (`--rule`), no
+por elevación. La escala tipográfica es propia (proporción 1.2 sobre
+`--texto-base`), ya no la de Tailwind renombrada al español. Cada
+concepto tiene su propia forma en vez de compartir la píldora de 999px
+de antes: filtro = pestaña con subrayado (`.chip`), estado = etiqueta
+rectangular con borde lateral de color (`.estado`), prioridad = marca
+compacta sin relleno (`.prioridad`), progreso = barra recta con valor
+tabular junto a ella (`.progreso-fila`), destino de navegación activo =
+borde lateral, nunca relleno sólido (`.sidebar__enlace.activo`) — la
+única forma con relleno sólido es un botón de acción.
 
 El patrón de puntos genérico (login y header) se sustituyó por una
 constelación real dibujada a mano en SVG (`index.html`,
@@ -36,10 +47,10 @@ de starfield en canvas) pero se descartaron: cualquier dependencia
 runtime externa reintroduce el mismo riesgo que motivó vendorizar
 `supabase-js` (ver arriba) — el sistema debe seguir funcionando si un
 CDN cae el día del evento — y para un solo elemento decorativo estático
-no hay nada que una librería resuelva mejor que un SVG de ~60 líneas. El
-`app-header` perdió el patrón de puntos sin reemplazo: es una barra
-persistente durante horas de trabajo real, no el lugar para una
-decoración.
+no hay nada que una librería resuelva mejor que un SVG de ~60 líneas. La
+barra lateral y las barras móviles no llevan el patrón de puntos:
+son chrome persistente durante horas de trabajo real, no el lugar para
+una decoración.
 
 Stack: HTML + CSS + JavaScript vanilla con módulos ES nativos. Sin
 framework, sin paso de build. Páginas HTML reales por módulo, no una SPA
@@ -50,17 +61,26 @@ gratuito.
 ## Arquitectura
 
 Cada módulo es una página `.html` real, no una ruta de un router por hash.
-`js/core/shell.js` centraliza el chrome compartido (header, nav, banner de
-conexión, compuerta de sesión) para que ninguna página lo duplique a
-mano; cada página solo declara los placeholders vacíos y llama a
-`montarShell()`. `js/core/parametros.js` reemplaza los parámetros de ruta
-del viejo router: las páginas de detalle usan query string
-(`tarea.html?id=...`). Con 19 páginas, el header/nav móvil solo muestra
-los destinos principales — todo lo de administración cuelga de un único
-enlace "Admin" y su propia sub-navegación en cada página `admin-*.html`
-(`pintarSubnavAdmin()` en `shell.js`). `registro.html` es la única
-excepción a "toda página exige sesión" — ver "Acreditación de
-delegados" más abajo.
+`js/core/shell.js` centraliza el chrome compartido (barra lateral, banner
+de conexión, compuerta de sesión) para que ninguna página lo duplique a
+mano; cada página solo declara los placeholders vacíos
+(`#app-sidebar`, `#app-topbar-movil`, `#app-nav-inferior`,
+`#app-drawer-fondo`, `#banner-conexion`) y llama a `montarShell()`.
+`js/core/parametros.js` reemplaza los parámetros de ruta del viejo
+router: las páginas de detalle usan query string (`tarea.html?id=...`).
+
+Navegación (Ronda 2): barra lateral izquierda persistente, agrupada en
+Operativo / Organización / Administración — un solo `ENLACES_NAV` con
+`grupo`/`requiere`/`enBarraInferior` reemplaza los antiguos
+`ENLACES_NAV`+`ENLACES_ADMIN` separados y la sub-navegación de chips por
+página (`pintarSubnavAdmin()`, eliminada). Colapsable a solo-iconos en
+escritorio (estado persistido en `localStorage`); en móvil se convierte
+en panel deslizable con una barra inferior curada de 4-5 destinos
+frecuentes. Es un único árbol de navegación en el DOM — CSS lo reposiciona
+por viewport, no se monta dos veces. El filtrado por permiso
+(`requiere: 'asignar' | 'admin'`) sigue siendo cosmético; la RLS es la
+autoridad real. `registro.html` es la única excepción a "toda página
+exige sesión" — ver "Acreditación de delegados" más abajo.
 
 ## Estructura
 

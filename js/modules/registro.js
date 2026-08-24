@@ -6,6 +6,7 @@ import { supabase } from '../core/supabase.js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../config.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 import { escapeHtml } from '../utils/formato.js';
+import { esqueletoTexto } from '../ui/esqueleto.js';
 import { comprimirImagen } from '../utils/imagen.js';
 import { qrcode } from '../vendor/qrcode-generator.js';
 import { ROL_ACREDITACION_LABEL } from '../utils/formato.js';
@@ -181,7 +182,7 @@ function mostrarResultado(codigo) {
 
 export async function render(el) {
   contenedor = el;
-  el.innerHTML = '<p class="estado-vacio">Cargando…</p>';
+  el.innerHTML = esqueletoTexto(5);
   regionales = await cargarRegionales();
   pintarFormulario(el);
 }

@@ -61,3 +61,21 @@ input, select, textarea {
 }
 
 ::selection { background: var(--gold-100); }
+
+/* K.6: foco visible consistente en todo control interactivo, sin el
+   anillo feo de click — :focus-visible ya distingue teclado de mouse. */
+:focus-visible {
+  outline: 2px solid var(--navy-500);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+:focus:not(:focus-visible) { outline: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
