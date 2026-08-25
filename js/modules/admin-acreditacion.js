@@ -107,7 +107,10 @@ function abrirModalHospedaje(acreditado, alTerminar) {
 }
 
 async function aprobar(acreditado, alTerminar) {
-  const { error } = await supabase.from('acreditados').update({ estado: 'aprobado' }).eq('id', acreditado.id);
+  const { sesion } = getEstado();
+  const { error } = await supabase.from('acreditados')
+    .update({ estado: 'aprobado', revisado_por_cargo_id: sesion.cargo.id, revisado_en: new Date().toISOString() })
+    .eq('id', acreditado.id);
   if (error) { mostrarAviso(mensajeError(error), 'error'); return; }
   mostrarAviso('Acreditación aprobada.', 'exito');
   alTerminar();
@@ -126,7 +129,10 @@ function abrirModalRechazo(acreditado, alTerminar) {
     e.preventDefault();
     const motivo = e.target.querySelector('[name="motivo"]').value.trim();
     if (!motivo) { mostrarAviso('Escribe un motivo para rechazar.', 'error'); return; }
-    const { error } = await supabase.from('acreditados').update({ estado: 'rechazado', motivo_rechazo: motivo }).eq('id', acreditado.id);
+    const { sesion } = getEstado();
+    const { error } = await supabase.from('acreditados')
+      .update({ estado: 'rechazado', motivo_rechazo: motivo, revisado_por_cargo_id: sesion.cargo.id, revisado_en: new Date().toISOString() })
+      .eq('id', acreditado.id);
     if (error) { mostrarAviso(mensajeError(error), 'error'); return; }
     mostrarAviso('Acreditación rechazada.', 'exito');
     cerrar();
