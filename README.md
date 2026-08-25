@@ -928,8 +928,11 @@ como delegado, mesa directiva, prensa, staff, etc. (9 roles, distintos de
   misma razón).
 - **Verificación en la puerta**: `verificar.html` (con sesión) — busca
   por código, muestra nombre/foto/estado, nunca datos de salud.
-  Accesible a cualquier staff autenticado, no solo a quien asigna: el
-  RLS de `acreditados` es de lectura abierta a `authenticated`.
+  `acreditados_select` es `puede_asignar()` desde `0037` (Bloque B) —
+  antes era de lectura abierta a cualquier `authenticated`; el cambio de
+  visibilidad cruzada de rama cerró esa apertura como efecto colateral
+  deliberado, documentado en la propia migración: un voluntario simple
+  en la puerta pierde la consulta de nombre/foto/estado de un delegado.
 - **Retención**: sin purga automática — son documentos de respaldo de
   una acreditación oficial, no evidencia operativa de una tarea.
 - **Regionales**: catálogo nuevo (`regionales`, 18 filas R1–R18) con
@@ -938,6 +941,24 @@ como delegado, mesa directiva, prensa, staff, etc. (9 roles, distintos de
   registro los necesita sin sesión).
 - **Revisión**: `admin-acreditacion.html` — aprobar/rechazar es
   `puede_asignar()`, igual que el resto del sistema.
+- **Hospedaje (Bloque J)**: `numero_habitacion`/`companero_habitacion`/
+  `lider_edificio` existen desde `0028` y el formulario público ya los
+  captura (sección "Hospedaje" de `registro.html`) — pero
+  `admin-acreditacion.html` nunca los leía ni mostraba: capturados, pero
+  invisibles para el staff, sin forma de corregir un error de tipeo o
+  reasignar una habitación. Sin migración: `acreditados_select`/
+  `acreditados_update` ya son `puede_asignar()` — la misma condición que
+  ya gatea toda esta página — así que el botón nuevo "Hospedaje" (junto
+  a "Salud", mismo patrón de modal) no necesita ningún gate de permiso
+  aparte. A diferencia de "Salud" (solo lectura), este modal es editable
+  — el hueco real era la falta de un camino para corregir. Los tres
+  campos siguen siendo texto libre, mismo tratamiento que
+  `regionales.tecnico_nombre`/`receptor_nombre` (contactos externos
+  identificados por nombre, no por una cuenta del sistema) — sin tablas
+  de edificios/habitaciones ni relación estructurada a `cargos`: quien
+  llena el formulario público no tiene sesión para elegir de una lista.
+  El buscador de la página ahora también busca por número de habitación
+  y líder de edificio.
 
 ## Fuera de alcance de esta ronda
 
@@ -947,9 +968,8 @@ comisiones y las 3+5 subsecretarías ya existe — ver "Subsecretarías y
 comisiones" — pero los cargos concretos de cada una todavía no se cargan;
 eso depende del panel de desarrollador y grupos de trabajo), consolidados
 en tiempo real, reportes y exportación, planificación
-estratégica, hospedaje detallado más allá de lo que ya captura
-acreditación (número de habitación/compañero/líder de edificio), y
-auditoría completa (esta ronda solo tiene la bitácora mínima). También
+estratégica, y auditoría completa (esta ronda solo tiene la bitácora
+mínima). También
 quedan pendientes de una ronda dedicada: paginación general de listas
 largas, densificación de
 `mis-tareas`/`bandeja` a tablas con filtros persistentes en la URL, PWA,

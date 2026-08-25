@@ -10,6 +10,7 @@ import { abrirModal } from '../ui/modal.js';
 import { mostrarAviso, mensajeError } from '../ui/aviso.js';
 import { crearTabla } from '../ui/tabla.js';
 import { esqueletoTabla } from '../ui/esqueleto.js';
+import { datosFormulario } from '../ui/formulario.js';
 import { ROL_ACREDITACION_LABEL, ESTADO_ACREDITADO_LABEL, escapeHtml } from '../utils/formato.js';
 import { puedeAsignar } from '../core/permisos.js';
 
@@ -20,7 +21,7 @@ let filtros = { estado: '', rol: '', texto: '' };
 async function cargar() {
   const { data, error } = await supabase
     .from('acreditados')
-    .select('id, codigo_qr, rol, nombre, apellido, telefono, correo, regional:regionales(codigo), estado, motivo_rechazo, creado_en, foto_path, certificado_medico_path')
+    .select('id, codigo_qr, rol, nombre, apellido, telefono, correo, regional:regionales(codigo), estado, motivo_rechazo, creado_en, foto_path, certificado_medico_path, numero_habitacion, companero_habitacion, lider_edificio')
     .order('creado_en', { ascending: false });
   if (error) { mostrarAviso(mensajeError(error), 'error'); return []; }
   return data;
@@ -31,7 +32,9 @@ function coincideTexto(a, texto) {
   const q = texto.toLowerCase();
   return `${a.nombre} ${a.apellido}`.toLowerCase().includes(q)
     || (a.correo || '').toLowerCase().includes(q)
-    || a.codigo_qr.toLowerCase().includes(q);
+    || a.codigo_qr.toLowerCase().includes(q)
+    || (a.numero_habitacion || '').toLowerCase().includes(q)
+    || (a.lider_edificio || '').toLowerCase().includes(q);
 }
 
 function aplicarFiltros(lista) {
@@ -72,6 +75,35 @@ async function verSalud(acreditado) {
     ${certificadoUrl ? `<p style="margin-top:1rem"><a href="${escapeHtml(certificadoUrl)}" target="_blank" rel="noopener">${icono('adjunto', { tamano: 14 })} Ver certificado médico (PDF)</a></p>` : ''}
   `;
   abrirModal({ titulo: `Salud — ${acreditado.nombre} ${acreditado.apellido}`, contenido: div, ancho: 'angosto' });
+}
+
+// Bloque J — numero_habitacion/companero_habitacion/lider_edificio ya
+// existen desde 0028 y ya los captura el registro público (registro.js);
+// acreditados_select/acreditados_update ya son abiertas a
+// puede_asignar() sin ninguna política aparte que replicar aquí (a
+// diferencia de Salud, que sí tiene su propia RLS más estrecha) — el
+// hueco real era que nadie del staff podía verlos ni corregirlos.
+function abrirModalHospedaje(acreditado, alTerminar) {
+  const div = document.createElement('div');
+  div.innerHTML = `
+    <form class="formulario" data-form-hospedaje>
+      <label class="campo"><span>Número de habitación</span><input name="numero_habitacion" value="${escapeHtml(acreditado.numero_habitacion || '')}" /></label>
+      <label class="campo"><span>Compañero de habitación</span><input name="companero_habitacion" value="${escapeHtml(acreditado.companero_habitacion || '')}" /></label>
+      <label class="campo"><span>Líder de edificio</span><input name="lider_edificio" value="${escapeHtml(acreditado.lider_edificio || '')}" /></label>
+      <button type="submit" class="boton boton--primario boton--ancho">Guardar</button>
+    </form>
+  `;
+  const { cerrar } = abrirModal({ titulo: `Hospedaje — ${acreditado.nombre} ${acreditado.apellido}`, contenido: div, ancho: 'angosto' });
+
+  div.querySelector('[data-form-hospedaje]').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const datos = datosFormulario(e.target);
+    const { error } = await supabase.from('acreditados').update(datos).eq('id', acreditado.id);
+    if (error) { mostrarAviso(mensajeError(error), 'error'); return; }
+    mostrarAviso('Hospedaje actualizado.', 'exito');
+    cerrar();
+    alTerminar();
+  });
 }
 
 async function aprobar(acreditado, alTerminar) {
@@ -164,6 +196,13 @@ async function pintar() {
       saludBtn.addEventListener('click', () => verSalud(acreditado));
       td.appendChild(saludBtn);
     }
+
+    const hospedajeBtn = document.createElement('button');
+    hospedajeBtn.type = 'button';
+    hospedajeBtn.className = 'boton boton--fantasma boton--pequeno';
+    hospedajeBtn.textContent = 'Hospedaje';
+    hospedajeBtn.addEventListener('click', () => abrirModalHospedaje(acreditado, recargar));
+    td.appendChild(hospedajeBtn);
   });
 
   cuerpo.innerHTML = '';
@@ -189,7 +228,7 @@ export async function render(el) {
       <span class="texto-mudo texto-pequeno" data-resumen></span>
     </div>
     <div class="checklist-filtros">
-      <input type="search" placeholder="Buscar por nombre, correo o código…" data-buscar class="campo-buscar" />
+      <input type="search" placeholder="Buscar por nombre, correo, código, habitación o líder de edificio…" data-buscar class="campo-buscar" />
       <div class="filtros-chip" data-estados>
         <button type="button" class="chip chip--activo" data-estado="">Todos</button>
         <button type="button" class="chip" data-estado="pendiente">Pendientes</button>
